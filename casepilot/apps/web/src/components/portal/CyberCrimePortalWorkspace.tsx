@@ -757,6 +757,36 @@ export function CyberCrimePortalWorkspace() {
                     🔊 {voiceModeActive ? 'Voice ON' : 'Voice OFF'}
                   </button>
 
+                  {/* Minimize Button */}
+                  <button
+                    type="button"
+                    onClick={() => setAiOpen(false)}
+                    title="Minimize into Bot Icon"
+                    style={{
+                      background: '#F8FAFC',
+                      border: '1px solid #E2E8F0',
+                      borderRadius: '50%',
+                      width: 26,
+                      height: 26,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      color: '#64748B',
+                      transition: 'all 150ms ease',
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = '#E2E8F0';
+                      e.currentTarget.style.color = '#0F172A';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = '#F8FAFC';
+                      e.currentTarget.style.color = '#64748B';
+                    }}
+                  >
+                    <Icons.Minimize />
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => setAiOpen(false)}
@@ -1043,6 +1073,71 @@ export function CyberCrimePortalWorkspace() {
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* ════════════════════════════════════════════════════════════════
+            MINIMIZED FLOATING AI BOT ICON
+            Always present whenever AI window is minimized
+           ════════════════════════════════════════════════════════════════ */}
+        {!aiOpen && (
+          <div
+            id="minimized-ai-bot-icon"
+            style={{
+              position: 'fixed',
+              bottom: 24,
+              right: 28,
+              zIndex: 99,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setAiOpen(true)}
+              title="Open CasePilot AI Assistant"
+              style={{
+                width: 52,
+                height: 52,
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #0F766E 0%, #0F172A 100%)',
+                color: '#FFFFFF',
+                border: '2px solid #14B8A6',
+                boxShadow: '0 8px 24px -2px rgba(15, 23, 42, 0.35), 0 0 16px rgba(20, 184, 166, 0.25)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                position: 'relative',
+                transition: 'all 200ms cubic-bezier(0.16, 1, 0.3, 1)',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.transform = 'translateY(-3px) scale(1.08)';
+                e.currentTarget.style.boxShadow = '0 12px 30px -2px rgba(15, 118, 110, 0.5), 0 0 22px rgba(20, 184, 166, 0.4)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                e.currentTarget.style.boxShadow = '0 8px 24px -2px rgba(15, 23, 42, 0.35), 0 0 16px rgba(20, 184, 166, 0.25)';
+              }}
+            >
+              <Icons.Bot size={26} />
+
+              {/* Glowing Active Online Status Dot */}
+              <span
+                style={{
+                  position: 'absolute',
+                  top: 2,
+                  right: 2,
+                  width: 12,
+                  height: 12,
+                  borderRadius: '50%',
+                  background: '#22C55E',
+                  border: '2px solid #0F172A',
+                  boxShadow: '0 0 8px #22C55E',
+                }}
+              />
+            </button>
           </div>
         )}
       </div>

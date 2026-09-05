@@ -224,16 +224,22 @@ export function HomePortalView({ cases, userName = 'Anuroop', onSelectCategory, 
                 </tr>
               </thead>
               <tbody>
-                {cases.map(c => (
-                  <tr key={c.id} onClick={() => onNavigateToTrack(c.id)} style={{ borderBottom: '1px solid #F3F4F6', cursor: 'pointer' }}
-                    onMouseEnter={e => (e.currentTarget.style.background = '#F9FAFB')} onMouseLeave={e => (e.currentTarget.style.background = '#FFFFFF')}>
-                    <td style={{ padding: '10px 14px', fontFamily: 'monospace', fontWeight: 700, fontSize: 12, color: '#111827' }}>{c.id}</td>
-                    <td style={{ padding: '10px 14px' }}><div style={{ fontFamily: MAN, fontSize: 14, fontWeight: 500, color: '#1F2937' }}>{c.category}</div><div style={{ fontFamily: MAN, fontSize: 12, color: '#6B7280' }}>{c.subCategory}</div></td>
-                    <td style={{ padding: '10px 14px', fontFamily: MAN, fontSize: 14, color: '#374151' }}>{c.amount}</td>
-                    <td style={{ padding: '10px 14px' }}><span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 4, fontFamily: MAN, background: c.needsAttention?'#FEF2F2':'#DCFCE7', color: c.needsAttention?'#DC2626':'#15803D', border: `1px solid ${c.needsAttention?'#FECACA':'#BBF7D0'}` }}>{c.status}</span></td>
-                    <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: MAN, fontSize: 14, fontWeight: 500, color: '#0F766E' }}>View →</td>
-                  </tr>
-                ))}
+                {cases.map(c => {
+                  const displayAmt = (c as any).financial?.amount ? `₹${(c as any).financial.amount}` : ((c as any).amount || 'Non-financial');
+                  const displayCat = (c as any).primaryCrimeType ? (c as any).primaryCrimeType.replace(/_/g, ' ') : (c as any).category;
+                  const displaySub = (c as any).subtype || (c as any).subCategory;
+
+                  return (
+                    <tr key={c.id} onClick={() => onNavigateToTrack(c.id)} style={{ borderBottom: '1px solid #F3F4F6', cursor: 'pointer' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#F9FAFB')} onMouseLeave={e => (e.currentTarget.style.background = '#FFFFFF')}>
+                      <td style={{ padding: '10px 14px', fontFamily: 'monospace', fontWeight: 700, fontSize: 12, color: '#111827' }}>{c.id}</td>
+                      <td style={{ padding: '10px 14px' }}><div style={{ fontFamily: MAN, fontSize: 14, fontWeight: 500, color: '#1F2937' }}>{displayCat}</div><div style={{ fontFamily: MAN, fontSize: 12, color: '#6B7280' }}>{displaySub}</div></td>
+                      <td style={{ padding: '10px 14px', fontFamily: MAN, fontSize: 14, color: '#374151' }}>{displayAmt}</td>
+                      <td style={{ padding: '10px 14px' }}><span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 4, fontFamily: MAN, background: c.needsAttention?'#FEF2F2':'#DCFCE7', color: c.needsAttention?'#DC2626':'#15803D', border: `1px solid ${c.needsAttention?'#FECACA':'#BBF7D0'}` }}>{c.status}</span></td>
+                      <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: MAN, fontSize: 14, fontWeight: 500, color: '#0F766E' }}>View →</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -244,31 +250,40 @@ export function HomePortalView({ cases, userName = 'Anuroop', onSelectCategory, 
       {/* Modal: Pathway Selector */}
       {showPathwayModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 20 }} onClick={() => setShowPathwayModal(false)}>
-          <div style={{ background: '#FFFFFF', borderRadius: 14, padding: 24, maxWidth: 500, width: '100%', boxShadow: '0 20px 40px rgba(0,0,0,0.12)' }} onClick={e => e.stopPropagation()}>
+          <div style={{ background: '#FFFFFF', borderRadius: 14, padding: 24, maxWidth: 540, width: '100%', maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 20px 40px rgba(0,0,0,0.12)' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
               <div>
-                <h3 style={{ fontSize: 16, fontWeight: 600, color: '#0F172A', margin: '0 0 3px' }}>Select Reporting Pathway</h3>
-                <p style={{ fontSize: 12, color: '#64748B', margin: 0 }}>Choose an NCRP category or let CasePilot AI guide you.</p>
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: '#0F172A', margin: '0 0 3px' }}>Select Reporting Pathway</h3>
+                <p style={{ fontSize: 12, color: '#64748B', margin: 0 }}>Every cybercrime pathway loads dedicated, relevant fields under NCRP standards.</p>
               </div>
               <button type="button" onClick={() => setShowPathwayModal(false)} style={{ background: 'none', border: 'none', fontSize: 16, cursor: 'pointer', color: '#94A3B8', padding: 4 }}>✕</button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {[
-                { icon: <Icons.CreditCard />, title: 'Online Financial Fraud', desc: 'UPI debit, bank impersonation, KYC fraud, credit card fraud', category: 'Online Financial Fraud', subCategory: 'Bank Impersonation Fraud', danger: false },
-                { icon: <Icons.Lock />, title: 'Other Cyber Crime', desc: 'Hacking, ransomware, corporate data leak, SIM cloning', category: 'Hacking / Defacement / Virus / Ransomware', subCategory: 'Ransomware Attack', danger: false },
-                { icon: <Icons.HeartHandshake />, title: 'Women & Children Crime', desc: 'Blackmail, morphed media extortion, stalking', category: 'Women & Children Related Crime', subCategory: 'Cyber Blackmail / Sextortion', danger: true },
+                { flowId: 'FINANCIAL_FRAUD', icon: <Icons.CreditCard />, title: 'Online Financial Fraud', desc: 'UPI debit, fake job task, electricity KYC APK, card skimming', danger: false },
+                { flowId: 'SOCIAL_MEDIA', icon: <Icons.Smartphone />, title: 'Social Media & Impersonation', desc: 'Fake profiles, morphed photos, account cloning, defamation', danger: false },
+                { flowId: 'HACKING', icon: <Icons.Lock />, title: 'Hacking & Account Compromise', desc: 'Email/Gmail breach, 2FA bypass, unauthorized session hijacking', danger: false },
+                { flowId: 'RANSOMWARE', icon: <Icons.AlertTriangle />, title: 'Ransomware & Malware Attacks', desc: 'Encrypted .locked files, server locks, crypto extortion demands', danger: true },
+                { flowId: 'PHISHING', icon: <Icons.PhoneCall />, title: 'Phishing, Vishing & Fake Links', desc: 'Suspicious bank links, digital arrest calls, TRAI/Police impersonation', danger: false },
+                { flowId: 'HARASSMENT', icon: <Icons.ShieldAlert />, title: 'Cyber Harassment & Cyberstalking', desc: 'Threatening messages, continuous abusive calls, doxxing, extortion', danger: false },
+                { flowId: 'WOMEN_CHILDREN', icon: <Icons.HeartHandshake />, title: 'Women & Children Related Crime', desc: '100% Anonymous or Report & Track confidential fast-track handling', danger: true },
+                { flowId: 'OTHER_CYBERCRIME', icon: <Icons.SearchActivity />, title: 'Other Cyber Crime', desc: 'Cryptocurrency scam, matrimonial fraud, identity theft', danger: false },
               ].map(p => (
                 <button
-                  key={p.title}
+                  key={p.flowId}
                   type="button"
-                  onClick={() => { setShowPathwayModal(false); onSelectCategory(p.category, p.subCategory); onNavigateToRegister(p.category, p.subCategory); }}
-                  style={{ padding: '12px 14px', borderRadius: 8, border: '1px solid #E2E8F0', background: '#FFFFFF', textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, transition: 'all 120ms' }}
+                  onClick={() => {
+                    setShowPathwayModal(false);
+                    onSelectCategory(p.flowId);
+                    onNavigateToRegister(p.flowId);
+                  }}
+                  style={{ padding: '10px 14px', borderRadius: 8, border: '1px solid #E2E8F0', background: '#FFFFFF', textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, transition: 'all 120ms' }}
                   onMouseEnter={e => { e.currentTarget.style.borderColor = p.danger ? '#DC2626' : '#0F766E'; e.currentTarget.style.background = p.danger ? '#FEF2F2' : '#F0FDFA'; }}
                   onMouseLeave={e => { e.currentTarget.style.borderColor = '#E2E8F0'; e.currentTarget.style.background = '#FFFFFF'; }}
                 >
                   <div style={{ width: 32, height: 32, borderRadius: 7, background: p.danger ? '#FEF2F2' : '#F0FDFA', color: p.danger ? '#DC2626' : '#0F766E', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{p.icon}</div>
-                  <div>
-                    <div style={{ fontSize: 13.5, fontWeight: 600, color: '#0F172A' }}>{p.title}</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>{p.title}</div>
                     <div style={{ fontSize: 11.5, color: '#64748B' }}>{p.desc}</div>
                   </div>
                 </button>

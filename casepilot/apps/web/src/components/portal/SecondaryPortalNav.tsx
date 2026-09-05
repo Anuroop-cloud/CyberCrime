@@ -18,38 +18,76 @@ export function SecondaryPortalNav({ tabs, activeTab, onTabChange }: Props) {
     <div
       style={{
         display: 'flex',
-        padding: '12px 32px 0',
-        gap: 24,
+        alignItems: 'center',
+        padding: '10px 24px',
         borderBottom: '1px solid #E2E8F0',
-        background: '#F8FAFC',
-        overflowX: 'auto',
+        background: '#FFFFFF',
         flexShrink: 0,
+        width: '100%',
       }}
     >
-      {tabs.map(tab => {
-        const isActive = activeTab === tab.id;
-        return (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => onTabChange(tab.id)}
-            style={{
-              padding: '0 0 10px 0',
-              border: 'none',
-              borderBottom: isActive ? '2.5px solid #0F766E' : '2.5px solid transparent',
-              background: 'transparent',
-              color: isActive ? '#0F766E' : '#64748B',
-              fontSize: 13,
-              fontWeight: isActive ? 600 : 500,
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              transition: 'all 150ms ease',
-            }}
-          >
-            {tab.label}
-          </button>
-        );
-      })}
+      <nav
+        aria-label="Sub Navigation"
+        style={{
+          display: 'flex',
+          width: '100%',
+          alignItems: 'center',
+          background: '#F8FAFC',
+          border: '1px solid #E2E8F0',
+          borderRadius: 12,
+          padding: '4px',
+          boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.02)',
+          gap: 6,
+        }}
+      >
+        {tabs.map(tab => {
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => onTabChange(tab.id)}
+              style={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '8px 16px',
+                border: 'none',
+                background: isActive ? '#0F172A' : 'transparent',
+                color: isActive ? '#FFFFFF' : '#475569',
+                fontSize: 13,
+                fontWeight: isActive ? 700 : 600,
+                letterSpacing: '-0.01em',
+                borderRadius: 8,
+                cursor: 'pointer',
+                transition: 'all 140ms ease',
+                fontFamily: "'Manrope', Helvetica, sans-serif",
+                whiteSpace: 'nowrap',
+                lineHeight: 1.3,
+                boxShadow: isActive ? '0 2px 6px rgba(15, 23, 42, 0.18)' : 'none',
+                textAlign: 'center',
+              }}
+              onMouseEnter={e => {
+                if (!isActive) {
+                  e.currentTarget.style.color = '#0F172A';
+                  e.currentTarget.style.background = '#FFFFFF';
+                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(15, 23, 42, 0.06)';
+                }
+              }}
+              onMouseLeave={e => {
+                if (!isActive) {
+                  e.currentTarget.style.color = '#475569';
+                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.boxShadow = 'none';
+                }
+              }}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </nav>
     </div>
   );
 }

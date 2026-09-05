@@ -1,0 +1,400 @@
+// =============================================================
+// CasePilot Prisma Schema
+// PostgreSQL + Prisma ORM
+// =============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================
+// ENUMS
+// =============================================================
+
+enum CaseStatus {
+  draft
+  submitted
+  acknowledged
+  assigned
+  under_investigation
+  closed
+  rejected
+  escalated
+}
+
+enum CaseCategory {
+  upi_fraud
+  credit_debit_fraud
+  investment_scam
+  phishing
+  job_fraud
+  matrimonial_fraud
+  otp_fraud
+  identity_theft
+  sextortion
+  ransomware
+  cyber_harassment
+  impersonation
+  account_compromise
+  other
+}
+
+enum PaymentMode {
+  upi
+  netbanking
+  card
+  cash
+  crypto
+  wallet
+  other
+}
+
+enum MalwareStatus {
+  pending
+  clean
+  flagged
+}
+
+enum NotificationType {
+  case_update
+  evidence_requested
+  system
+  urgent
+  escalation
+}
+
+enum EscalationUrgency {
+  low
+  medium
+  high
+  critical
+}
+
+enum EscalationStatus {
+  open
+  in_review
+  resolved
+  dismissed
+}
+
+enum AiRunStage {
+  classification
+  schema_selection
+  field_extraction
+  confidence_scoring
+  missing_fields
+  contradiction_detection
+  evidence_planning
+  review_packet
+  submission_packet
+  case_health
+  escalation_guidance
+}
+
+enum AiProvider {
+  mock
+  openai
+}
+
+enum FieldSource {
+  ai
+  user
+  system
+}
+
+// =============================================================
+// AUTH MODELS
+// =============================================================
+
+model User {
+  id        String   @id @default(cuid())
+  mobile    String   @unique
+  name      String   @default("User")
+  email     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cases         Case[]
+  notifications Notification[]
+  sessions      Session[]
+  auditEvents   CaseEvent[]
+
+  @@index([mobile])
+}
+
+model OtpSession {
+  id        String   @id @default(cuid())
+  mobile    String
+  code      String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([mobile])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+}
+
+// =============================================================
+// CASE MODELS
+// =============================================================
+
+model Case {
+  id                String       @id @default(cuid())
+  caseNumber        String       @unique
+  userId            String
+  status            CaseStatus   @default(draft)
+  category          CaseCategory
+  title             String
+  description       String       @db.Text
+  incidentDate      DateTime?
+  incidentLocation  String?
+  platform          String?
+  isDraft           Boolean      @default(true)
+  submittedAt       DateTime?
+  acknowledgedAt    DateTime?
+  closedAt          DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  user          User            @relation(fields: [userId], references: [id])
+  transaction   Transaction?
+  suspects      Suspect[]
+  victim        Victim?
+  evidence      Evidence[]
+  aiRuns        AiRun[]
+  extractions   FieldExtraction[]
+  missingFields MissingField[]
+  conflicts     Conflict[]
+  events        CaseEvent[]
+  notifications Notification[]
+  escalations   Escalation[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([caseNumber])
+}
+
+model Transaction {
+  id              String      @id @default(cuid())
+  caseId          String      @unique
+  amountLost      Decimal?    @db.Decimal(12, 2)
+  currency        String      @default("INR")
+  transactionId   String?
+  transactionDate DateTime?
+  upiRef          String?
+  bankName        String?
+  accountNumber   String?     // stored masked
+  ifscCode        String?
+  paymentMode     PaymentMode?
+  additionalNotes String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+}
+
+model Suspect {
+  id             String   @id @default(cuid())
+  caseId         String
+  name           String?
+  mobile         String?  // stored masked
+  email          String?
+  bankAccount    String?  // stored masked
+  upiId          String?
+  socialHandle   String?
+  platform       String?
+  ipAddress      String?
+  websiteUrl     String?
+  additionalInfo String?  @db.Text
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+}
+
+model Victim {
+  id           String   @id @default(cuid())
+  caseId       String   @unique
+  name         String?
+  mobile       String?  // stored masked
+  email        String?
+  address      String?
+  aadhaarLast4 String?
+  panLast4     String?
+  occupation   String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+}
+
+// =============================================================
+// EVIDENCE
+// =============================================================
+
+model Evidence {
+  id            String        @id @default(cuid())
+  caseId        String
+  fileName      String
+  originalName  String
+  mimeType      String
+  sizeBytes     Int
+  malwareStatus MalwareStatus @default(pending)
+  storagePath   String        // private path, never served directly
+  uploadedAt    DateTime      @default(now())
+  description   String?
+  isDeleted     Boolean       @default(false)
+
+  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+}
+
+// =============================================================
+// AI PIPELINE MODELS
+// =============================================================
+
+model AiRun {
+  id          String     @id @default(cuid())
+  caseId      String
+  stage       AiRunStage
+  provider    AiProvider @default(mock)
+  inputText   String     @db.Text
+  outputJson  Json
+  tokensUsed  Int        @default(0)
+  durationMs  Int        @default(0)
+  success     Boolean    @default(true)
+  errorMsg    String?
+  createdAt   DateTime   @default(now())
+
+  case        Case            @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  extractions FieldExtraction[]
+
+  @@index([caseId])
+  @@index([stage])
+}
+
+model FieldExtraction {
+  id         String      @id @default(cuid())
+  caseId     String
+  aiRunId    String?
+  fieldPath  String      // e.g. "transaction.amountLost"
+  label      String
+  value      Json
+  confidence Float       @default(0)
+  source     FieldSource @default(ai)
+  accepted   Boolean     @default(false)
+  createdAt  DateTime    @default(now())
+
+  case  Case   @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  aiRun AiRun? @relation(fields: [aiRunId], references: [id])
+
+  @@index([caseId])
+  @@index([fieldPath])
+}
+
+model MissingField {
+  id         String   @id @default(cuid())
+  caseId     String
+  fieldPath  String
+  label      String
+  required   Boolean  @default(false)
+  promptText String?
+  resolved   Boolean  @default(false)
+  resolvedAt DateTime?
+  createdAt  DateTime @default(now())
+
+  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+}
+
+model Conflict {
+  id            String    @id @default(cuid())
+  caseId        String
+  fieldPath     String
+  existingValue Json
+  newValue      Json
+  resolved      Boolean   @default(false)
+  resolution    String?
+  resolvedAt    DateTime?
+  createdAt     DateTime  @default(now())
+
+  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+}
+
+// =============================================================
+// EVENTS, NOTIFICATIONS, ESCALATIONS
+// =============================================================
+
+model CaseEvent {
+  id        String   @id @default(cuid())
+  caseId    String
+  userId    String?
+  eventType String   // e.g. "status_change", "field_updated", "evidence_uploaded"
+  note      String?
+  metadata  Json?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  case Case  @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([caseId])
+  @@index([eventType])
+}
+
+model Notification {
+  id          String           @id @default(cuid())
+  userId      String
+  title       String
+  body        String
+  type        NotificationType
+  read        Boolean          @default(false)
+  caseId      String?
+  caseNumber  String?
+  createdAt   DateTime         @default(now())
+
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  case Case? @relation(fields: [caseId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([read])
+}
+
+model Escalation {
+  id          String            @id @default(cuid())
+  caseId      String
+  reason      String            @db.Text
+  urgency     EscalationUrgency @default(medium)
+  status      EscalationStatus  @default(open)
+  requestedAt DateTime          @default(now())
+  resolvedAt  DateTime?
+  notes       String?           @db.Text
+
+  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+  @@index([status])
+}

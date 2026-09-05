@@ -16,19 +16,36 @@ export function PortalHeader({ activeTab, onTabChange }: Props) {
       style={{
         background: '#FFFFFF',
         borderBottom: '1px solid #E2E8F0',
-        padding: '0 24px',
-        height: 52,
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: 16,
+        flexDirection: 'column',
         flexShrink: 0,
         zIndex: 20,
       }}
     >
-      <PortalIdentity />
-      <PrimaryPortalNav activeTab={activeTab} onTabChange={onTabChange} />
-      <UtilityActions />
+      {/* Top Header Row */}
+      <div
+        style={{
+          padding: '10px 24px 8px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          borderBottom: '1px solid #F1F5F9',
+        }}
+      >
+        <PortalIdentity />
+        <UtilityActions />
+      </div>
+
+      {/* Tab Bar Row below Header */}
+      <div
+        style={{
+          padding: '6px 24px 8px',
+          display: 'flex',
+          alignItems: 'center',
+        }}
+      >
+        <PrimaryPortalNav activeTab={activeTab} onTabChange={onTabChange} />
+      </div>
     </header>
   );
 }

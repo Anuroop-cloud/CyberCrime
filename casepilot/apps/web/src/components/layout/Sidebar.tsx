@@ -86,12 +86,10 @@ export default function Sidebar({ onToggle }: SidebarProps = {}) {
 
   const [expanded, setExpanded] = useState(true);
   const [draftCount, setDraftCount] = useState(0);
-  const [notifCount, setNotifCount] = useState(0);
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
 
   useEffect(() => {
     api.cases.stats().then(s => setDraftCount(s.draft)).catch(() => {});
-    api.notifications.list().then(r => setNotifCount(r.unreadCount)).catch(() => {});
   }, [pathname]);
 
   const W = expanded ? 240 : 74;
@@ -109,30 +107,37 @@ export default function Sidebar({ onToggle }: SidebarProps = {}) {
     { href: '/dashboard?tab=help', tabKey: 'help', label: 'Help & Guides', Icon: Icons.HelpCircle },
   ];
 
-  const isItemActive = (item: (typeof NAV_ITEMS)[0]) => {
+  const [activePortalTab, setActivePortalTab] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
-      const currentTab = urlParams.get('tab');
-      if (pathname === '/dashboard') {
-        if (item.tabKey === 'home') return !currentTab || currentTab === 'home';
-        return currentTab === item.tabKey;
-      }
+      const tab = urlParams.get('tab');
+      if (tab) return tab;
     }
-    if (pathname === '/complaints/new') return item.tabKey === 'register';
-    if (pathname === '/track') return item.tabKey === 'track';
-    return false;
+    if (pathname === '/complaints/new') return 'register';
+    if (pathname === '/track') return 'track';
+    return 'home';
+  });
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const ce = e as CustomEvent<string>;
+      if (ce.detail) setActivePortalTab(ce.detail);
+    };
+    window.addEventListener('portalTabChange', handler);
+    return () => window.removeEventListener('portalTabChange', handler);
+  }, []);
+
+  const isItemActive = (item: (typeof NAV_ITEMS)[0]) => {
+    return activePortalTab === item.tabKey;
   };
 
-  const isPathActive = (href: string) => pathname === href || pathname.startsWith(href);
 
   const handleNavClick = (tabKey: string) => {
+    setActivePortalTab(tabKey);
     window.dispatchEvent(new CustomEvent('portalTabChange', { detail: tabKey }));
   };
 
-  const BOTTOM_ITEMS = [
-    { href: '/notifications', label: 'Notifications', Icon: Icons.Bell, badge: notifCount || undefined },
-    { href: '/profile', label: 'Profile', Icon: Icons.User },
-  ];
+
 
   return (
     <aside
@@ -156,46 +161,77 @@ export default function Sidebar({ onToggle }: SidebarProps = {}) {
         boxSizing: 'border-box',
       }}
     >
-      {/* ── Brand Header + Collapse Toggle ────────────────── */}
+      {/* ── Brand Header + Collapse Toggle (Aarvak Reference Style) ── */}
       <div
         style={{
+          position: 'relative',
           display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
-          padding: expanded ? '0 16px 18px' : '0 12px 18px',
-          justifyContent: expanded ? 'space-between' : 'center',
+          padding: expanded ? '14px 14px 18px' : '10px 8px 14px',
           borderBottom: '1px solid #EBEBEB',
           marginBottom: 14,
         }}
       >
-        <Link href="/dashboard" style={{ textDecoration: 'none' }}>
-          <BrandLogo collapsed={!expanded} size="md" />
+        {expanded ? (
+          <button
+            onClick={toggle}
+            aria-label="Collapse sidebar"
+            title="Collapse sidebar"
+            style={{
+              position: 'absolute',
+              top: 10,
+              right: 12,
+              background: '#FFFFFF',
+              border: '1px solid #E2E8F0',
+              borderRadius: 6,
+              cursor: 'pointer',
+              padding: '4px 5px',
+              color: '#64748B',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
+              transition: 'background 150ms, color 150ms',
+              zIndex: 2,
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.background = '#F1F5F9';
+              e.currentTarget.style.color = '#0F172A';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = '#FFFFFF';
+              e.currentTarget.style.color = '#64748B';
+            }}
+          >
+            <Icons.PanelToggle />
+          </button>
+        ) : (
+          <button
+            onClick={toggle}
+            aria-label="Expand sidebar"
+            title="Expand sidebar"
+            style={{
+              background: '#FFFFFF',
+              border: '1px solid #E2E8F0',
+              borderRadius: 6,
+              cursor: 'pointer',
+              padding: '4px 5px',
+              color: '#64748B',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: 10,
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
+            }}
+          >
+            <Icons.PanelToggle />
+          </button>
+        )}
+
+        <Link href="/dashboard" style={{ textDecoration: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <BrandLogo collapsed={!expanded} showcase={true} />
         </Link>
-        <button
-          onClick={toggle}
-          aria-label={expanded ? 'Collapse sidebar' : 'Expand sidebar'}
-          style={{
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            padding: 6,
-            borderRadius: 6,
-            color: '#64748B',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transition: 'background 150ms, color 150ms',
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.background = '#E8E8E8';
-            e.currentTarget.style.color = '#0F172A';
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.background = 'none';
-            e.currentTarget.style.color = '#64748B';
-          }}
-        >
-          <Icons.PanelToggle />
-        </button>
       </div>
 
       {/* ── Primary Navigation (New Buttons & Functions, No +New Complaint) ────────────────────────────── */}
@@ -219,18 +255,18 @@ export default function Sidebar({ onToggle }: SidebarProps = {}) {
                 justifyContent: expanded ? 'flex-start' : 'center',
                 borderRadius: 8,
                 textDecoration: 'none',
-                fontWeight: active ? 700 : 500,
+                fontWeight: active ? 600 : 500,
                 fontSize: 13,
                 color: active ? '#FFFFFF' : hovered ? '#0F172A' : '#475569',
-                background: active ? '#0F172A' : hovered ? '#EDEDED' : 'transparent',
+                background: active ? '#0F766E' : hovered ? '#EDEDED' : 'transparent',
                 transition: 'background 140ms ease, color 140ms ease',
                 position: 'relative',
                 whiteSpace: 'nowrap',
-                boxShadow: active ? '0 2px 8px rgba(15, 23, 42, 0.16)' : 'none',
+                boxShadow: active ? '0 2px 8px rgba(15, 118, 110, 0.28)' : 'none',
               }}
               title={!expanded ? item.label : undefined}
             >
-              <span style={{ color: active ? '#38BDF8' : '#64748B', display: 'flex', alignItems: 'center' }}>
+              <span style={{ color: active ? '#FFFFFF' : hovered ? '#0F172A' : '#64748B', display: 'flex', alignItems: 'center' }}>
                 <item.Icon />
               </span>
               {expanded && <span style={{ flex: 1 }}>{item.label}</span>}
@@ -264,57 +300,9 @@ export default function Sidebar({ onToggle }: SidebarProps = {}) {
           gap: 4,
         }}
       >
-        {BOTTOM_ITEMS.map(item => {
-          const active = isPathActive(item.href);
-          const hovered = hoveredItem === item.href;
-
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onMouseEnter={() => setHoveredItem(item.href)}
-              onMouseLeave={() => setHoveredItem(null)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12,
-                padding: expanded ? '9px 12px' : '9px',
-                justifyContent: expanded ? 'flex-start' : 'center',
-                borderRadius: 8,
-                textDecoration: 'none',
-                fontWeight: active ? 600 : 500,
-                fontSize: 13,
-                color: active ? '#FFFFFF' : hovered ? '#0F172A' : '#475569',
-                background: active ? '#135D66' : hovered ? '#EDEDED' : 'transparent',
-                transition: 'background 150ms, color 150ms',
-                whiteSpace: 'nowrap',
-              }}
-              title={!expanded ? item.label : undefined}
-            >
-              <item.Icon />
-              {expanded && <span style={{ flex: 1 }}>{item.label}</span>}
-              {expanded && item.badge !== undefined && (
-                <span
-                  style={{
-                    background: '#EF4444',
-                    color: '#FFFFFF',
-                    fontSize: 10,
-                    fontWeight: 700,
-                    padding: '1px 6px',
-                    borderRadius: 999,
-                  }}
-                >
-                  {item.badge}
-                </span>
-              )}
-            </Link>
-          );
-        })}
-
         {/* User Card with Sign Out */}
         <div
           style={{
-            marginTop: 8,
             padding: expanded ? '10px 10px' : '8px 4px',
             background: '#EFEFEF',
             borderRadius: 8,

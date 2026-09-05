@@ -429,7 +429,7 @@ export function CyberCrimePortalWorkspace({ initialTab }: WorkspaceProps = {}) {
       subtype: caseState.subCategory || 'In Progress',
       intakeMode,
       isAnonymous: Boolean(caseState.isAnonymous === 'anonymous'),
-      health: 'Good',
+      health: 'On Track',
       needsAttention: false,
       incident: {
         date: caseState.incidentDate || '2026-09-05',
@@ -458,7 +458,7 @@ export function CyberCrimePortalWorkspace({ initialTab }: WorkspaceProps = {}) {
         status: i === 0 ? 'completed' : i === 1 ? 'current' : 'upcoming'
       })),
       events: [
-        { id: '1', timestamp: 'Just now', title: 'Draft Saved Locally', desc: 'Case draft saved to your browser session.', type: 'citizen' }
+        { id: '1', timestamp: 'Just now', title: 'Draft Saved Locally', desc: 'Case draft saved to your browser session.', source: 'user_reported', type: 'citizen' }
       ],
       nextActions: [
         { id: '1', title: 'Complete Missing Fields', description: 'Review and complete remaining required sections.', type: 'upload_evidence', actionLabel: 'Resume Draft' }
@@ -488,7 +488,7 @@ export function CyberCrimePortalWorkspace({ initialTab }: WorkspaceProps = {}) {
       subtype: caseState.subCategory || 'General Incident',
       intakeMode,
       isAnonymous: Boolean(caseState.isAnonymous === 'anonymous'),
-      health: flowId === 'FINANCIAL_FRAUD' ? 'Critical' : 'Good',
+      health: flowId === 'FINANCIAL_FRAUD' ? 'Urgent' : 'On Track',
       needsAttention: flowId === 'FINANCIAL_FRAUD',
       incident: {
         date: caseState.incidentDate || new Date().toISOString().split('T')[0],
@@ -529,8 +529,8 @@ export function CyberCrimePortalWorkspace({ initialTab }: WorkspaceProps = {}) {
         date: i === 0 ? 'Just now' : undefined
       })),
       events: [
-        { id: '1', timestamp: 'Just now', title: 'Formal NCRP Acknowledgment Generated', desc: `Complaint registered under ${ackNo}.`, type: 'system' },
-        { id: '2', timestamp: 'Just now', title: 'State Cyber Cell Dispatched', desc: `Jurisdiction allocated to ${caseState.stateUt || 'National Desk'}.`, type: 'officer' }
+        { id: '1', timestamp: 'Just now', title: 'Formal NCRP Acknowledgment Generated', desc: `Complaint registered under ${ackNo}.`, source: 'official', type: 'system' },
+        { id: '2', timestamp: 'Just now', title: 'State Cyber Cell Dispatched', desc: `Jurisdiction allocated to ${caseState.stateUt || 'National Desk'}.`, source: 'official', type: 'officer' }
       ],
       nextActions: flowId === 'FINANCIAL_FRAUD' ? [
         { id: '1', title: 'Call 1930 Helpline', description: 'Provide token to initiate inter-bank account freeze.', type: 'urgent_call', actionLabel: 'Call 1930 Helpline' }
@@ -563,6 +563,7 @@ export function CyberCrimePortalWorkspace({ initialTab }: WorkspaceProps = {}) {
         timestamp: 'Just now',
         title: 'Additional Evidence Appended',
         desc: `Citizen uploaded "${file.name}" (SHA-256: ${item.sha256.slice(0, 16)}...).`,
+        source: 'user_reported',
         type: 'citizen'
       });
       CasesStore.saveCase(existing);
@@ -579,6 +580,7 @@ export function CyberCrimePortalWorkspace({ initialTab }: WorkspaceProps = {}) {
         timestamp: 'Just now',
         title: 'Grievance Escalation Filed',
         desc: 'Escalation sent directly to State Cyber Crime Nodal Officer.',
+        source: 'user_reported',
         type: 'citizen'
       });
       existing.needsAttention = false;
@@ -741,7 +743,10 @@ export function CyberCrimePortalWorkspace({ initialTab }: WorkspaceProps = {}) {
 
           {/* MODULE 4: HELP & GUIDES */}
           {primaryTab === 'help' && (
-            <HelpPortalView />
+            <HelpPortalView
+              onNavigateToRegister={() => setPrimaryTab('register')}
+              onNavigateToTrack={() => setPrimaryTab('track')}
+            />
           )}
         </div>
 

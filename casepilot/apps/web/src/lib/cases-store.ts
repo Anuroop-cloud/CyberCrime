@@ -1,4 +1,4 @@
-import { Case } from '../types/case-model';
+import { Case, CaseHealth, CaseEvent } from '../types/case-model';
 
 export const INITIAL_DEMO_CASES: Case[] = [
   // ── CASE 1: FINANCIAL FRAUD (Golden Hour Inter-Bank Freeze) ───────────────
@@ -10,7 +10,9 @@ export const INITIAL_DEMO_CASES: Case[] = [
     subtype: 'UPI / QR Code Fraud',
     intakeMode: 'ai',
     isAnonymous: false,
-    health: 'Critical',
+    health: 'Urgent',
+    healthReason: 'Lien marker placed on suspect wallet; 48-hour bank window open. Immediate formal follow-up needed for chargeback before funds are dispersed.',
+    daysStagnant: 1,
     needsAttention: true,
     incident: {
       date: '2026-09-04',
@@ -62,16 +64,85 @@ export const INITIAL_DEMO_CASES: Case[] = [
       { stageId: 'recovery', label: 'Court Restitution Order', description: 'Sec 457 CrPC application awaiting magistrate signoff.', status: 'upcoming' }
     ],
     events: [
-      { id: 'ev-1', timestamp: '04 Sep, 14:42', title: 'NCRP Formal Acknowledgment', desc: 'Complaint registered under NCRP-2026-MH-981249.', type: 'system' },
-      { id: 'ev-2', timestamp: '04 Sep, 15:45', title: '1930 Inter-Bank Freeze Successful', desc: 'HDFC Bank Nodal confirmed lien marker on suspect wallet taskpay@okhdfcbank.', type: 'officer' },
-      { id: 'ev-3', timestamp: '05 Sep, 11:20', title: 'IO Notice Issued', desc: 'Investigating Officer issued Sec 91 CrPC notice for suspect KYC details.', type: 'officer' }
+      {
+        id: 'ev-1',
+        timestamp: '04 Sep, 14:42',
+        title: 'Formal NCRP Complaint Registered',
+        desc: 'Complaint successfully registered on the National Cybercrime Reporting Portal. Acknowledgment token NCRP-2026-MH-981249 generated with priority routing tag to the National Cyber Fraud Reporting & Management System (CFCFRMS).',
+        source: 'official',
+        type: 'system',
+        referenceNumber: 'NCRP-2026-MH-981249',
+        statutorySection: 'Section 66D IT Act / Section 420 IPC',
+        stationOrAgency: 'National Cyber Crime Reporting Portal (MHA)',
+      },
+      {
+        id: 'ev-2',
+        timestamp: '04 Sep, 14:52',
+        title: 'Automated NPCI Switch Reconciliation',
+        desc: 'Automated transaction switch audit verified UTR 418293847291 across the UPI reconciliation switch. Originating debit: State Bank of India; Destination credit: taskpay@okhdfcbank.',
+        source: 'official',
+        type: 'system',
+        referenceNumber: 'NPCI/UPI/RECON-89104',
+        stationOrAgency: 'National Payments Corporation of India (NPCI)',
+      },
+      {
+        id: 'ev-3',
+        timestamp: '04 Sep, 15:10',
+        title: '1930 Inter-Bank Freeze Dispatch',
+        desc: 'Maharashtra Cyber Fraud Command Centre alerted HDFC Bank Nodal officer under Golden Hour freeze protocol. Requisition issued to place emergency lien hold on suspect account.',
+        source: 'official',
+        type: 'officer',
+        officerName: 'Desk Officer #14 (1930 Desk)',
+        stationOrAgency: 'Maharashtra State Cyber Command Centre',
+      },
+      {
+        id: 'ev-4',
+        timestamp: '04 Sep, 15:45',
+        title: 'Lien Marker Confirmed by Beneficiary Bank',
+        desc: 'HDFC Bank Central Fraud Control Unit confirmed placement of emergency lien marker of ₹52,000 on beneficiary account linked to taskpay@okhdfcbank.',
+        source: 'official',
+        type: 'officer',
+        referenceNumber: 'HDFC/LIEN/2026/0942',
+        stationOrAgency: 'HDFC Bank Central Fraud Control Unit',
+        outcome: 'Funds Frozen in Destination Wallet',
+      },
+      {
+        id: 'ev-5',
+        timestamp: '05 Sep, 09:30',
+        title: 'Complainant In-Person Branch Submission',
+        desc: 'Complainant visited SBI Bandra branch, submitted dispute form with certified bank statement, and physical copy of NCRP acknowledgment slip for chargeback processing.',
+        source: 'user_reported',
+        type: 'citizen',
+        stationOrAgency: 'State Bank of India, Bandra West Branch',
+        officerName: 'Branch Operations Desk',
+      },
+      {
+        id: 'ev-6',
+        timestamp: '05 Sep, 11:20',
+        title: 'Section 91 CrPC Notice Issued by IO',
+        desc: 'Investigating Officer issued formal requisition under Section 91 CrPC directing HDFC Bank to freeze debits, preserve digital audit trails, and submit suspect account opening KYC documents.',
+        source: 'official',
+        type: 'officer',
+        officerName: 'Inspector K. Patil',
+        stationOrAgency: 'Cyber Crime Police Station, Bandra, Mumbai',
+        statutorySection: 'Section 91 CrPC / Section 94 BNSS',
+      },
+      {
+        id: 'ev-7',
+        timestamp: '05 Sep, 14:00',
+        title: 'CasePilot Procedural Assessment',
+        desc: 'Active lien hold confirmed. Beneficiary bank requires court order under Section 457 CrPC / Section 503 BNSS for release and restitution of frozen funds to the victim\'s account. Action window: 7 days before bank reviews temporary hold.',
+        source: 'casepilot_assessment',
+        type: 'system',
+        statutorySection: 'Section 457 CrPC (Magistrate Restitution Order)',
+      },
     ],
     nextActions: [
       { id: 'act-1', title: 'Call 1930 with Token', description: 'Verify lien marker status with Maharashtra Cyber Fraud Helpline.', type: 'urgent_call', actionLabel: 'Call 1930 Helpline' },
       { id: 'act-2', title: 'Download Formal NCRP FIR Slip', description: 'Present this receipt at your home bank branch for chargeback processing.', type: 'download_receipt', actionLabel: 'Download PDF Receipt' }
     ],
     createdAt: '2026-09-04T14:42:00Z',
-    updatedAt: '2026-09-05T11:20:00Z'
+    updatedAt: '2026-09-05T14:00:00Z'
   },
 
   // ── CASE 2: INSTAGRAM IMPERSONATION (Social Media / Sec 79 Takedown) ─────
@@ -83,8 +154,10 @@ export const INITIAL_DEMO_CASES: Case[] = [
     subtype: 'Fake Profile / Account Impersonation',
     intakeMode: 'manual',
     isAnonymous: false,
-    health: 'Good',
-    needsAttention: false,
+    health: 'Attention Required',
+    healthReason: 'Sec 79 IT Act notice sent to Meta 72h ago. Fake account is still active and requesting funds from contacts.',
+    daysStagnant: 3,
+    needsAttention: true,
     incident: {
       date: '2026-09-02',
       state: 'Karnataka',
@@ -130,14 +203,62 @@ export const INITIAL_DEMO_CASES: Case[] = [
       { stageId: 'resolved', label: 'Account Disabled', description: 'Confirmation from platform.', status: 'upcoming' }
     ],
     events: [
-      { id: 'ev-1', timestamp: '02 Sep, 18:15', title: 'Case Registered', desc: 'Case assigned to Cyber Crime Cell Bengaluru Central.', type: 'system' },
-      { id: 'ev-2', timestamp: '03 Sep, 10:00', title: 'Notice Served to Meta India', desc: 'Sec 79 IT Act Takedown Notice dispatched to grievance-officer@meta.com.', type: 'officer' }
+      {
+        id: 'ev-1',
+        timestamp: '02 Sep, 18:15',
+        title: 'Impersonation Complaint Lodged',
+        desc: 'Complaint registered under Section 66C and 66D of the IT Act regarding unauthorized creation of fake profile @riya_cyber_xx soliciting money from contacts.',
+        source: 'official',
+        type: 'system',
+        referenceNumber: 'NCRP-2026-KA-410291',
+        stationOrAgency: 'Cyber Crime Police Station, Bengaluru Central',
+      },
+      {
+        id: 'ev-2',
+        timestamp: '02 Sep, 19:30',
+        title: 'Digital Forensic Hash Archival',
+        desc: 'Digital forensic team preserved full webpage archival, HTML source, and SHA-256 cryptographic hash of offending posts for evidentiary admissibility under Section 65B Indian Evidence Act.',
+        source: 'official',
+        type: 'officer',
+        statutorySection: 'Section 65B Indian Evidence Act / Section 63 BSA',
+        referenceNumber: 'DIGI-EVID-KA-8819',
+        stationOrAgency: 'CID Cyber Crime Division, Karnataka',
+      },
+      {
+        id: 'ev-3',
+        timestamp: '03 Sep, 10:00',
+        title: 'Section 79 Notice Served to Meta India',
+        desc: 'Statutory intermediary notice under Section 79(3)(b) IT Act and Rule 3(1)(d) IT Rules 2021 dispatched to Meta India Grievance Officer directing disabling of impersonator account within 36 hours.',
+        source: 'official',
+        type: 'officer',
+        officerName: 'SI Manjunath H.',
+        stationOrAgency: 'Cyber Crime Police Station, Bengaluru Central',
+        statutorySection: 'Section 79(3)(b) IT Act 2000',
+      },
+      {
+        id: 'ev-4',
+        timestamp: '04 Sep, 17:30',
+        title: 'Complainant Follow-up: Account Still Active',
+        desc: 'Complainant verified and logged that impersonator profile remains online and has posted new fraudulent stories requesting money transfers.',
+        source: 'user_reported',
+        type: 'citizen',
+        stationOrAgency: 'Instagram Web Platform',
+      },
+      {
+        id: 'ev-5',
+        timestamp: '05 Sep, 10:00',
+        title: 'CasePilot Assessment: Takedown Stalled',
+        desc: 'Statutory 36-hour takedown window under Rule 3(1)(d) Information Technology (Intermediary Guidelines) Rules 2021 has elapsed without platform compliance. Immediate grievance escalation to Karnataka State Cyber Nodal Officer recommended.',
+        source: 'casepilot_assessment',
+        type: 'system',
+        statutorySection: 'Rule 3(1)(d) IT Rules 2021',
+      },
     ],
     nextActions: [
       { id: 'act-1', title: 'Check Profile Status', description: 'Verify if @riya_cyber_xx is still publicly accessible.', type: 'takedown_check', actionLabel: 'Verify Profile URL' }
     ],
     createdAt: '2026-09-02T18:15:00Z',
-    updatedAt: '2026-09-03T10:00:00Z'
+    updatedAt: '2026-09-05T10:00:00Z'
   },
 
   // ── CASE 3: ACCOUNT HACKING (Email & 2FA Bypass) ──────────────────────────
@@ -149,8 +270,10 @@ export const INITIAL_DEMO_CASES: Case[] = [
     subtype: 'Email / Gmail / Outlook Hijacking',
     intakeMode: 'ai',
     isAnonymous: false,
-    health: 'Attention',
-    needsAttention: true,
+    health: 'Waiting',
+    healthReason: 'Emergency preservation order acknowledged by Google LLC. Awaiting secondary trust verification and forensic IP triage.',
+    daysStagnant: 2,
+    needsAttention: false,
     incident: {
       date: '2026-09-01',
       time: '03:15',
@@ -196,14 +319,60 @@ export const INITIAL_DEMO_CASES: Case[] = [
       { stageId: 'recovery', label: 'Account Restoration', description: 'Secondary verification scheduled with Google Trust & Safety.', status: 'upcoming' }
     ],
     events: [
-      { id: 'ev-1', timestamp: '01 Sep, 08:45', title: 'Case Filed', desc: 'Case assigned to Special Cell IFSO Delhi Police.', type: 'system' },
-      { id: 'ev-2', timestamp: '02 Sep, 14:00', title: 'Forensic Triage Completed', desc: 'Malware artifact identified from desktop session dump.', type: 'officer' }
+      {
+        id: 'ev-1',
+        timestamp: '01 Sep, 08:45',
+        title: 'Intrusion & Compromise Case Allocated',
+        desc: 'Case registered under Section 43 & Section 66 IT Act for unauthorized computer access, session hijacking, and international recovery number substitution.',
+        source: 'official',
+        type: 'system',
+        referenceNumber: 'NCRP-2026-DL-192834',
+        stationOrAgency: 'Special Cell IFSO, Delhi Police',
+      },
+      {
+        id: 'ev-2',
+        timestamp: '01 Sep, 11:30',
+        title: 'Emergency Preservation Notice Served to Google',
+        desc: 'Legal preservation requisition under Section 91 CrPC served to Google Legal Support India requesting preservation of connection logs, session identifiers, and originating IP addresses.',
+        source: 'official',
+        type: 'officer',
+        officerName: 'DCP IFSO Special Cell Desk',
+        statutorySection: 'Section 91 CrPC',
+        stationOrAgency: 'Special Cell (IFSO), Dwarka, Delhi',
+      },
+      {
+        id: 'ev-3',
+        timestamp: '02 Sep, 14:00',
+        title: 'Forensic Triage: RedLine Stealer Identified',
+        desc: 'Device memory inspection revealed intrusion initiated via malicious browser extension infostealer malware (RedLine variant) exfiltrating active session tokens.',
+        source: 'official',
+        type: 'officer',
+        referenceNumber: 'IFSO/LAB/2026/4102',
+        stationOrAgency: 'Delhi Police Cyber Forensic Laboratory',
+      },
+      {
+        id: 'ev-4',
+        timestamp: '03 Sep, 11:30',
+        title: 'Clean Antivirus Scan Submitted by Citizen',
+        desc: 'Complainant uploaded clean full-system scan report proving malware removal and revoked all active OAuth application permissions.',
+        source: 'user_reported',
+        type: 'citizen',
+        stationOrAgency: 'Complainant Primary Workstation',
+      },
+      {
+        id: 'ev-5',
+        timestamp: '04 Sep, 16:00',
+        title: 'CasePilot Assessment: Enterprise Support SLA',
+        desc: 'Enterprise account restoration request pending with Google Trust & Safety. Case is within standard 5-7 business day turnaround SLA window; no premature escalation required.',
+        source: 'casepilot_assessment',
+        type: 'system',
+      },
     ],
     nextActions: [
       { id: 'act-1', title: 'Submit Clean Device Scan', description: 'Upload antivirus scan log proving trojan was removed from laptop.', type: 'upload_evidence', actionLabel: 'Upload Scan Log' }
     ],
     createdAt: '2026-09-01T08:45:00Z',
-    updatedAt: '2026-09-02T14:00:00Z'
+    updatedAt: '2026-09-04T16:00:00Z'
   },
 
   // ── CASE 4: RANSOMWARE (Healthcare / Server Encryption) ───────────────────
@@ -215,7 +384,9 @@ export const INITIAL_DEMO_CASES: Case[] = [
     subtype: 'Ransomware (Files Encrypted / .locked)',
     intakeMode: 'ai',
     isAnonymous: false,
-    health: 'Critical',
+    health: 'Attention Required',
+    healthReason: 'No Investigating Officer assigned by local cyber cell after 6 days, despite healthcare service disruption.',
+    daysStagnant: 6,
     needsAttention: true,
     incident: {
       date: '2026-08-30',
@@ -262,13 +433,50 @@ export const INITIAL_DEMO_CASES: Case[] = [
       { stageId: 'crypto_track', label: 'Blockchain Ledger Trace', description: 'Wallet address monitored on Chainalysis for exchange cashout.', status: 'upcoming' }
     ],
     events: [
-      { id: 'ev-1', timestamp: '30 Aug, 09:30', title: 'CERT-In Alert Generated', desc: 'Critical healthcare infrastructure cyber incident notification sent.', type: 'system' }
+      {
+        id: 'ev-1',
+        timestamp: '30 Aug, 09:30',
+        title: 'National CERT-In Incident Notification',
+        desc: 'Critical healthcare infrastructure cyber incident logged under mandatory 6-hour cybersecurity reporting directive. Ticket #CERT-IN-2026-8910 registered.',
+        source: 'official',
+        type: 'system',
+        referenceNumber: 'CERT-IN-2026-8910',
+        stationOrAgency: 'Indian Computer Emergency Response Team (CERT-In)',
+      },
+      {
+        id: 'ev-2',
+        timestamp: '30 Aug, 10:15',
+        title: 'System Quarantine Advisory Issued',
+        desc: 'Forensics desk verified clinic systems isolated from local network; official police guidelines issued strictly advising against extortion payment.',
+        source: 'official',
+        type: 'officer',
+        stationOrAgency: 'Gujarat State Cyber Command Cell',
+      },
+      {
+        id: 'ev-3',
+        timestamp: '01 Sep, 12:00',
+        title: 'Clinic Administrator Visited Cyber Police Station',
+        desc: 'Clinic administrator handed over physical server audit logs, encrypted sample files, and ransom note text at Ahmedabad Cyber Crime Police Station.',
+        source: 'user_reported',
+        type: 'citizen',
+        stationOrAgency: 'Cyber Crime Police Station, Ahmedabad',
+        officerName: 'Duty Officer Desk',
+      },
+      {
+        id: 'ev-4',
+        timestamp: '05 Sep, 12:00',
+        title: 'CasePilot Assessment: Investigation Delay Alert',
+        desc: 'No Investigating Officer assigned by local station after 6 days, despite healthcare diagnostic disruption. Formal escalation to Gujarat Cyber Nodal Officer (SP Cyber Crime Cell) recommended.',
+        source: 'casepilot_assessment',
+        type: 'system',
+        statutorySection: 'Section 66 & 66F IT Act (Cyber Terrorism)',
+      },
     ],
     nextActions: [
       { id: 'act-1', title: 'Do NOT Pay Ransom', description: 'CERT-In and Police guidelines strictly advise against extortion payments.', type: 'takedown_check', actionLabel: 'View CERT-In Advisory' }
     ],
     createdAt: '2026-08-30T09:30:00Z',
-    updatedAt: '2026-08-31T12:00:00Z'
+    updatedAt: '2026-09-05T12:00:00Z'
   },
 
   // ── CASE 5: CYBER HARASSMENT / STALKING (Threats on WhatsApp) ────────────
@@ -280,7 +488,9 @@ export const INITIAL_DEMO_CASES: Case[] = [
     subtype: 'Persistent Cyberstalking / Tracking',
     intakeMode: 'manual',
     isAnonymous: false,
-    health: 'Good',
+    health: 'On Track',
+    healthReason: 'Active investigation. Investigating Officer has dispatched CDR and tower triangulation requisitions to telecom providers.',
+    daysStagnant: 0,
     needsAttention: false,
     incident: {
       date: '2026-08-28',
@@ -321,13 +531,56 @@ export const INITIAL_DEMO_CASES: Case[] = [
       { stageId: 'intervention', label: 'Police Warning / Summons', description: 'Suspect identification in progress.', status: 'upcoming' }
     ],
     events: [
-      { id: 'ev-1', timestamp: '28 Aug, 16:30', title: 'Case Allocated', desc: 'Case assigned to Sub-Inspector Cyber Cell Kochi.', type: 'officer' }
+      {
+        id: 'ev-1',
+        timestamp: '28 Aug, 16:30',
+        title: 'Offence Registered under Section 354D IPC',
+        desc: 'Complaint registered for persistent cyberstalking, anonymous threat calls, and criminal intimidation.',
+        source: 'official',
+        type: 'officer',
+        referenceNumber: 'NCRP-2026-KL-330192',
+        statutorySection: 'Section 354D IPC / Section 78 BNS',
+        stationOrAgency: 'Cyber Crime Police Station, Kochi',
+      },
+      {
+        id: 'ev-2',
+        timestamp: '29 Aug, 11:00',
+        title: 'In-Person Statement Recorded under Sec 161 CrPC',
+        desc: 'Complainant met with Investigating Officer at Kochi Cyber Cell; formal statement recorded under Section 161 CrPC; 4 audio recordings and timestamped call logs deposited.',
+        source: 'user_reported',
+        type: 'citizen',
+        officerName: 'SI Suresh Kumar',
+        stationOrAgency: 'Kochi Cyber Crime Police Station',
+        statutorySection: 'Section 161 CrPC',
+      },
+      {
+        id: 'ev-3',
+        timestamp: '31 Aug, 15:45',
+        title: 'CDR & Tower Triangulation Requisition',
+        desc: 'Investigating Officer issued Section 91 CrPC notice to telecom service providers (BSNL & Reliance Jio) for Call Detail Records, IMEI history, and cell tower triangulation.',
+        source: 'official',
+        type: 'officer',
+        officerName: 'SI Suresh Kumar',
+        statutorySection: 'Section 91 CrPC / Section 94 BNSS',
+        referenceNumber: 'KOCHI/CYBER/CDR/892',
+        stationOrAgency: 'Cyber Crime Police Station, Kochi',
+      },
+      {
+        id: 'ev-4',
+        timestamp: '03 Sep, 10:30',
+        title: 'Telecom Subscriber Data Received',
+        desc: 'Preliminary telecom report received for suspect SIMs; tower locations pinpointed to Ernakulam North sector. Suspect identification in active progress.',
+        source: 'official',
+        type: 'officer',
+        stationOrAgency: 'Cyber Crime Police Station, Kochi',
+        outcome: 'Suspect Location Triangulated',
+      },
     ],
     nextActions: [
       { id: 'act-1', title: 'Preserve Call Logs', description: 'Do not delete chat history or call duration records.', type: 'download_receipt', actionLabel: 'View Evidence Guidelines' }
     ],
     createdAt: '2026-08-28T16:30:00Z',
-    updatedAt: '2026-08-29T10:00:00Z'
+    updatedAt: '2026-09-03T10:30:00Z'
   },
 
   // ── CASE 6: WOMEN & CHILDREN SENSITIVE (Anonymous Fast-Track Report) ─────
@@ -339,8 +592,10 @@ export const INITIAL_DEMO_CASES: Case[] = [
     subtype: 'Child Sexual Abuse Material (CSAM) / Non-Consensual Imagery',
     intakeMode: 'ai',
     isAnonymous: true,
-    health: 'Critical',
-    needsAttention: true,
+    health: 'On Track',
+    healthReason: 'Emergency takedown notice dispatched. Platform compliance and forensic preservation active.',
+    daysStagnant: 1,
+    needsAttention: false,
     incident: {
       date: '2026-09-03',
       state: 'Rajasthan',
@@ -384,8 +639,26 @@ export const INITIAL_DEMO_CASES: Case[] = [
       { stageId: 'resolved', label: 'Channel Banned & Case Concluded', description: 'Telegram banned channel globally; FIR filed.', status: 'upcoming' }
     ],
     events: [
-      { id: 'ev-1', timestamp: '03 Sep, 12:10', title: 'Confidential Priority Assigned', desc: '100% Anonymous status guaranteed under NCRP guidelines.', type: 'system' },
-      { id: 'ev-2', timestamp: '03 Sep, 12:45', title: 'Channel Takedown Dispatched', desc: 'Telegram Nodal Desk India acknowledged receipt.', type: 'officer' }
+      {
+        id: 'ev-1',
+        timestamp: '03 Sep, 12:10',
+        title: 'Confidential Priority Assigned',
+        desc: '100% Anonymous status guaranteed under NCRP guidelines. Metadata scrubbed for complainant privacy.',
+        source: 'official',
+        type: 'system',
+        referenceNumber: 'POCSO-CONF-0091',
+        stationOrAgency: 'Special Cyber Cell (Women & Child Safety), Jaipur',
+      },
+      {
+        id: 'ev-2',
+        timestamp: '03 Sep, 12:45',
+        title: 'Channel Takedown Requisition Dispatched',
+        desc: 'Emergency statutory notice under Rule 3(1)(b) IT Rules dispatched to Telegram FZ-LLC Nodal Officer India.',
+        source: 'official',
+        type: 'officer',
+        statutorySection: 'Rule 3(1)(b) IT Rules 2021',
+        stationOrAgency: 'CBI Special Cyber Crime Division',
+      },
     ],
     nextActions: [
       { id: 'act-1', title: 'Zero Identity Disclosure', description: 'Your report is completely anonymous; no personal information will be revealed.', type: 'takedown_check', actionLabel: 'View Privacy Guarantee' }
@@ -395,7 +668,7 @@ export const INITIAL_DEMO_CASES: Case[] = [
   }
 ];
 
-const STORAGE_KEY = 'casepilot_active_cases_v2';
+const STORAGE_KEY = 'casepilot_active_cases_v4';
 
 export class CasesStore {
   private static cases: Case[] | null = null;
@@ -439,6 +712,48 @@ export class CasesStore {
     }
   }
 
+  static logFollowUp(
+    caseId: string,
+    event: {
+      title: string;
+      desc: string;
+      officerName?: string;
+      stationOrAgency?: string;
+      source?: 'user_reported' | 'official' | 'casepilot_assessment';
+    }
+  ): Case | undefined {
+    const c = this.getCaseById(caseId);
+    if (!c) return undefined;
+
+    const newEv: CaseEvent = {
+      id: 'ev-user-' + Date.now(),
+      timestamp:
+        new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) +
+        ', ' +
+        new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+      title: event.title,
+      desc: event.desc,
+      source: event.source || 'user_reported',
+      type: 'citizen',
+      officerName: event.officerName,
+      stationOrAgency: event.stationOrAgency,
+    };
+
+    c.events = [newEv, ...c.events];
+    c.daysStagnant = 0;
+    this.saveCase(c);
+    return c;
+  }
+
+  static updateCaseHealth(caseId: string, health: CaseHealth, reason?: string): Case | undefined {
+    const c = this.getCaseById(caseId);
+    if (!c) return undefined;
+    c.health = health;
+    if (reason) c.healthReason = reason;
+    this.saveCase(c);
+    return c;
+  }
+
   static resolveConflict(caseId: string, conflictId: string, resolvedValue: string): void {
     const c = this.getCaseById(caseId);
     if (!c) return;
@@ -448,7 +763,6 @@ export class CasesStore {
       conf.resolved = true;
       conf.resolvedValue = resolvedValue;
 
-      // Update the actual field if it was a fraudAmount conflict
       if (conf.field === 'fraudAmount' && c.financial) {
         c.financial.amount = resolvedValue;
       }

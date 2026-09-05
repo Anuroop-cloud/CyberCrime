@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Icons } from './Icons';
-import { portalTheme } from './portalTheme';
-import { Case } from '../../types/case-model';
-import { SecondaryPortalNav } from './SecondaryPortalNav';
+import { Case, CaseHealth } from '../../types/case-model';
+import { CasesStore } from '@/lib/cases-store';
+import { useToast } from '@/lib/toast-context';
 
 interface Props {
   cases: Case[];
@@ -26,7 +26,7 @@ interface NodalDirectoryEntry {
 const NODAL_DIRECTORY: Record<string, NodalDirectoryEntry> = {
   Maharashtra: {
     state: 'Maharashtra',
-    officerName: 'Shri Sanjay Shintre (IPS)',
+    officerName: 'Shri Sanjay Shintre, IPS',
     designation: 'Superintendent of Police, Maharashtra Cyber',
     address: 'World Trade Centre, 32nd Floor, Cuffe Parade, Mumbai - 400005',
     email: 'sp.cyber-mah@gov.in',
@@ -34,7 +34,7 @@ const NODAL_DIRECTORY: Record<string, NodalDirectoryEntry> = {
   },
   Karnataka: {
     state: 'Karnataka',
-    officerName: 'Dr. B. M. Laxmi Prasad (IPS)',
+    officerName: 'Dr. B. M. Laxmi Prasad, IPS',
     designation: 'Superintendent of Police, CID Cyber Crime Division',
     address: 'Carlton House, Palace Road, Bengaluru, Karnataka - 560001',
     email: 'spcyber-cid@ksp.gov.in',
@@ -42,7 +42,7 @@ const NODAL_DIRECTORY: Record<string, NodalDirectoryEntry> = {
   },
   Delhi: {
     state: 'Delhi',
-    officerName: 'Shri Hemant Tiwari (IPS)',
+    officerName: 'Shri Hemant Tiwari, IPS',
     designation: 'DCP Cyber Crime Unit (IFSO), Special Cell',
     address: 'Sector 17, Dwarka, New Delhi - 110078',
     email: 'dcp-cyber-delhi@nic.in',
@@ -50,7 +50,7 @@ const NODAL_DIRECTORY: Record<string, NodalDirectoryEntry> = {
   },
   Gujarat: {
     state: 'Gujarat',
-    officerName: 'Shri Dharmendra Sharma (IPS)',
+    officerName: 'Shri Dharmendra Sharma, IPS',
     designation: 'Superintendent of Police, State Cyber Crime Cell',
     address: 'Police Bhavan, Sector 18, Gandhinagar, Gujarat - 382018',
     email: 'cc-cid@gujarat.gov.in',
@@ -58,624 +58,580 @@ const NODAL_DIRECTORY: Record<string, NodalDirectoryEntry> = {
   },
   Kerala: {
     state: 'Kerala',
-    officerName: 'Shri Hari Sankar (IPS)',
+    officerName: 'Shri Hari Sankar, IPS',
     designation: 'SP Cyber Operations & Cyberdome Desk',
     address: 'Police Headquarters, Vazhuthacaud, Thiruvananthapuram - 695010',
     email: 'spcyberops.pol@kerala.gov.in',
     phone: '+91 471 272 2215',
   },
+  Rajasthan: {
+    state: 'Rajasthan',
+    officerName: 'Shri Vikas Kumar, IPS',
+    designation: 'DIG Police, Cyber Crime Cell & CID-CB',
+    address: 'Police Headquarters, Lal Kothi, Jaipur, Rajasthan - 302015',
+    email: 'cyber-cell-raj@nic.in',
+    phone: '+91 141 274 0848',
+  },
 };
 
+function getHealthBadge(health: CaseHealth) {
+  switch (health) {
+    case 'Urgent':
+      return {
+        label: 'Urgent',
+        color: '#991B1B',
+        bg: '#FEF2F2',
+        border: '#FECACA',
+        dotColor: '#DC2626',
+      };
+    case 'Attention Required':
+      return {
+        label: 'Attention Required',
+        color: '#92400E',
+        bg: '#FFFBEB',
+        border: '#FDE68A',
+        dotColor: '#D97706',
+      };
+    case 'Waiting':
+      return {
+        label: 'Waiting',
+        color: '#075985',
+        bg: '#F0F9FF',
+        border: '#BAE6FD',
+        dotColor: '#0284C7',
+      };
+    case 'On Track':
+      return {
+        label: 'On Track',
+        color: '#065F46',
+        bg: '#ECFDF5',
+        border: '#A7F3D0',
+        dotColor: '#059669',
+      };
+    default:
+      return {
+        label: 'Unknown',
+        color: '#475569',
+        bg: '#F8FAFC',
+        border: '#E2E8F0',
+        dotColor: '#94A3B8',
+      };
+  }
+}
+
 export function TrackCasePortalView({
-  cases,
+  cases: propCases,
   selectedCaseId,
   onSelectCaseId,
-  onGrievanceEscalate,
-  onAddEvidenceToCase,
 }: Props) {
-  const [trackSubTab, setTrackSubTab] = useState<'all' | 'attention' | 'timeline' | 'escalation'>('all');
+  const { toast } = useToast();
+
+  const [casesList, setCasesList] = useState<Case[]>(propCases);
+  const [activeTab, setActiveTab] = useState<'cases' | 'tracking' | 'actions'>('cases');
   const [searchQuery, setSearchQuery] = useState('');
-  const [stageFilter, setStageFilter] = useState<'all' | 'investigation' | 'assigned' | 'attention'>('all');
+  const [healthFilter, setHealthFilter] = useState<'All' | CaseHealth>('All');
 
-  // Modals state
-  const [showReceiptModal, setShowReceiptModal] = useState(false);
-  const [showTakedownModal, setShowTakedownModal] = useState(false);
-  const [showAdvisoryModal, setShowAdvisoryModal] = useState(false);
-  const [targetActionCase, setTargetActionCase] = useState<Case | null>(null);
+  // Interactive follow-up modal state
+  const [showLogFollowUpModal, setShowLogFollowUpModal] = useState(false);
+  const [followUpActivity, setFollowUpActivity] = useState('Visited Police Station');
+  const [followUpOfficer, setFollowUpOfficer] = useState('');
+  const [followUpStation, setFollowUpStation] = useState('');
+  const [followUpNotes, setFollowUpNotes] = useState('');
 
-  // Escalation form state
-  const [escalateCaseId, setEscalateCaseId] = useState<string>(selectedCaseId);
-  const [grievanceCategory, setGrievanceCategory] = useState('1930_delay');
-  const [grievanceNarrative, setGrievanceNarrative] = useState('');
-  const [escalateSuccess, setEscalateSuccess] = useState<string | null>(null);
+  // Escalation Pack modal state
+  const [showEscalationModal, setShowEscalationModal] = useState(false);
+  const [isEditingDossier, setIsEditingDossier] = useState(false);
+  const [customIssueNarrative, setCustomIssueNarrative] = useState('');
+  const [customRequestedAction, setCustomRequestedAction] = useState('');
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [activeUploadCaseId, setActiveUploadCaseId] = useState<string | null>(null);
+  // 1930 call confirmation modal state
+  const [show1930Modal, setShow1930Modal] = useState(false);
 
-  // Safe case selector
-  const selectedCase = cases.find(c => c.id === selectedCaseId) || cases[0] || null;
-  const attentionCases = cases.filter(c => c.needsAttention);
+  // Active selected case
+  const activeCase = useMemo(() => {
+    return casesList.find(c => c.id === selectedCaseId) || casesList[0] || null;
+  }, [casesList, selectedCaseId]);
 
-  // Filtering for table
-  const filteredCases = cases.filter(c => {
-    if (stageFilter === 'attention' && !c.needsAttention) return false;
-    if (stageFilter === 'investigation' && c.status !== 'investigation') return false;
-    if (stageFilter === 'assigned' && c.status !== 'assigned') return false;
+  // Filtered cases list
+  const filteredCases = useMemo(() => {
+    return casesList.filter(c => {
+      if (healthFilter !== 'All' && c.health !== healthFilter) return false;
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase();
+      return (
+        c.id.toLowerCase().includes(q) ||
+        (c.ackNumber && c.ackNumber.toLowerCase().includes(q)) ||
+        c.subtype.toLowerCase().includes(q) ||
+        c.primaryCrimeType.toLowerCase().includes(q) ||
+        c.incident.state.toLowerCase().includes(q)
+      );
+    });
+  }, [casesList, healthFilter, searchQuery]);
 
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      c.id.toLowerCase().includes(q) ||
-      (c.ackNumber && c.ackNumber.toLowerCase().includes(q)) ||
-      c.primaryCrimeType.toLowerCase().includes(q) ||
-      c.subtype.toLowerCase().includes(q) ||
-      c.incident.state.toLowerCase().includes(q)
-    );
-  });
-
-  const handleActionClick = (actionType: string, c: Case) => {
-    setTargetActionCase(c);
-    if (actionType === 'urgent_call') {
-      if (confirm(`You are about to dial 1930 National Cyber Fraud Helpline for Case ${c.id}.\n\nHave your NCRP Acknowledgment token (${c.ackNumber}) ready for the desk officer.`)) {
-        window.location.href = 'tel:1930';
-      }
-    } else if (actionType === 'download_receipt') {
-      onSelectCaseId(c.id);
-      setShowReceiptModal(true);
-    } else if (actionType === 'upload_evidence') {
-      setActiveUploadCaseId(c.id);
-      fileInputRef.current?.click();
-    } else if (actionType === 'takedown_check') {
-      onSelectCaseId(c.id);
-      setShowTakedownModal(true);
-    } else if (actionType === 'view_advisory') {
-      onSelectCaseId(c.id);
-      setShowAdvisoryModal(true);
-    } else {
-      onSelectCaseId(c.id);
-    }
-  };
-
-  const handleEvidenceUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    const targetId = activeUploadCaseId || selectedCase?.id;
-    if (!files || files.length === 0 || !targetId) return;
-
-    for (let i = 0; i < files.length; i++) {
-      onAddEvidenceToCase?.(targetId, files[i]);
-    }
-    if (fileInputRef.current) fileInputRef.current.value = '';
-    setActiveUploadCaseId(null);
-  };
-
-  const handleEscalateSubmit = (e: React.FormEvent) => {
+  // Handle saving new follow-up
+  const handleSaveFollowUp = (e: React.FormEvent) => {
     e.preventDefault();
-    const targetId = escalateCaseId || selectedCase?.id;
-    if (!targetId) return;
+    if (!activeCase) return;
 
-    onGrievanceEscalate?.(targetId);
-    const trackingRef = `ESC-2026-${targetId.replace(/[^0-9]/g, '').slice(-5)}-${Math.floor(100 + Math.random() * 900)}`;
-    setEscalateSuccess(trackingRef);
-    setGrievanceNarrative('');
+    if (!followUpNotes.trim()) {
+      toast({ type: 'warning', title: 'Details Required', body: 'Please enter notes on this follow-up.' });
+      return;
+    }
+
+    const updated = CasesStore.logFollowUp(activeCase.id, {
+      title: `${followUpActivity}: ${followUpStation || activeCase.incident.state + ' Unit'}`,
+      desc: followUpNotes,
+      officerName: followUpOfficer.trim() || undefined,
+      stationOrAgency: followUpStation.trim() || undefined,
+      source: 'user_reported',
+    });
+
+    if (updated) {
+      setCasesList(CasesStore.getAllCases());
+      toast({
+        type: 'success',
+        title: 'Follow-up Recorded',
+        body: 'Activity added to case chronology.',
+      });
+      setShowLogFollowUpModal(false);
+      setFollowUpNotes('');
+      setFollowUpOfficer('');
+      setFollowUpStation('');
+    }
   };
 
-  const getNodalOfficerForCase = (c?: Case | null): NodalDirectoryEntry => {
-    const state = c?.incident?.state || 'National';
-    return (
-      NODAL_DIRECTORY[state] || {
-        state: state,
-        officerName: 'State Cyber Crime Desk / I4C Secretariat',
-        designation: 'Supervisory Cyber Crime Nodal Desk',
-        address: 'National Cybercrime Reporting Portal, I4C MHA, New Delhi - 110001',
-        email: 'cybercrime-i4c@gov.in',
-        phone: '1930 / 011-23438000',
-      }
+  // Open official NCRP tracker
+  const handleCheckOfficialNcrp = () => {
+    if (activeCase?.ackNumber) {
+      navigator.clipboard.writeText(activeCase.ackNumber);
+      toast({
+        type: 'info',
+        title: 'Token Copied to Clipboard',
+        body: `${activeCase.ackNumber} copied. Opening official NCRP portal.`,
+      });
+    }
+    window.open('https://cybercrime.gov.in/Webform/Check_Status.aspx', '_blank');
+  };
+
+  // Email Nodal Officer
+  const handleEmailNodalOfficer = (entry: NodalDirectoryEntry) => {
+    if (!activeCase) return;
+    const subject = encodeURIComponent(
+      `Status Requisition: NCRP Complaint Token ${activeCase.ackNumber || activeCase.id}`
     );
+    const body = encodeURIComponent(
+      `To:\nThe Superintendent of Police / Nodal Officer\nCyber Crime Division, ${entry.state}\n\n` +
+      `Respected Sir/Madam,\n\n` +
+      `I am writing to formally request a status update on the preliminary inquiry for the following registered cybercrime complaint:\n\n` +
+      `• NCRP Acknowledgment Number: ${activeCase.ackNumber || 'Pending'}\n` +
+      `• Internal Reference: ${activeCase.id}\n` +
+      `• Date of Registration: ${activeCase.incident.date}\n` +
+      `• Location: ${activeCase.incident.district}, ${activeCase.incident.state}\n` +
+      `• Category: ${activeCase.subtype}\n` +
+      (activeCase.financial?.lostMoney ? `• Disputed Sum: INR ${activeCase.financial.amount}\n` : '') +
+      `\nIssue Summary:\n${activeCase.healthReason || activeCase.incident.description}\n\n` +
+      `Requested Action:\nKindly direct the concerned Investigating Officer to provide written inquiry status and issue necessary statutory notices under Section 91 CrPC / Section 79 IT Act.\n\n` +
+      `Respectfully,\n[Complainant Name]\n[Contact Number]`
+    );
+    window.location.href = `mailto:${entry.email}?subject=${subject}&body=${body}`;
   };
+
+  const handleCopyDossier = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast({
+      type: 'success',
+      title: 'Petition Copied',
+      body: 'Formal text copied to clipboard.',
+    });
+  };
+
+  const nodalEntry = activeCase ? NODAL_DIRECTORY[activeCase.incident.state] || NODAL_DIRECTORY['Maharashtra'] : null;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-      <input
-        ref={fileInputRef}
-        type="file"
-        multiple
-        onChange={handleEvidenceUpload}
-        style={{ display: 'none' }}
-      />
-
-      {/* ── Sub Navigation Tabs ── */}
-      <SecondaryPortalNav
-        tabs={[
-          { id: 'all', label: `All Registered Cases (${cases.length})` },
-          { id: 'attention', label: `Needs Attention (${attentionCases.length})` },
-          { id: 'timeline', label: 'Workflow & Milestones' },
-          { id: 'escalation', label: 'Escalations & Nodal Officer' },
-        ]}
-        activeTab={trackSubTab}
-        onTabChange={tabId => {
-          setTrackSubTab(tabId);
-          if (tabId === 'attention' && attentionCases.length > 0 && (!selectedCase || !selectedCase.needsAttention)) {
-            onSelectCaseId(attentionCases[0].id);
-          }
-          if (tabId === 'escalation' && selectedCase) {
-            setEscalateCaseId(selectedCase.id);
-          }
-        }}
-      />
-
-      {/* ── Content Canvas ── */}
+    <div
+      style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        overflowY: 'auto',
+        background: '#F8FAFC',
+        fontFamily: "'Manrope', Helvetica, sans-serif",
+      }}
+    >
+      {/* ── Professional Sub-Header ── */}
       <div
         style={{
-          flex: 1,
-          overflowY: 'auto',
-          padding: '20px 28px 40px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 20,
           background: '#FFFFFF',
-          scrollbarWidth: 'none',
-          msOverflowStyle: 'none',
+          borderBottom: '1px solid #E2E8F0',
+          padding: '16px 32px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: 16,
+          position: 'sticky',
+          top: 0,
+          zIndex: 20,
         }}
       >
-        {/* ══════════════════════════════════════════════════════════════
-            SUBTAB 1: ALL REGISTERED CASES
-           ══════════════════════════════════════════════════════════════ */}
-        {trackSubTab === 'all' && (
-          <>
-            {/* KPI Summary Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
-              <div style={{ ...portalTheme.containers.sectionCard, padding: 14 }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
-                  Total Registered
-                </span>
-                <div style={{ fontSize: 24, fontWeight: 800, color: '#0F172A', marginTop: 4 }}>
-                  {cases.length}
-                </div>
-                <div style={{ fontSize: 11, color: '#0F766E', marginTop: 2 }}>Formal NCRP acknowledgments</div>
-              </div>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <h1 style={{ fontSize: 19, fontWeight: 800, color: '#0F172A', margin: 0, letterSpacing: '-0.02em' }}>
+              Track & Take Action
+            </h1>
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: '#0F766E',
+                background: '#F0FDFA',
+                border: '1px solid #CCFBF1',
+                padding: '2px 8px',
+                borderRadius: 4,
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase',
+              }}
+            >
+              Case Progression & Escalation
+            </span>
+          </div>
+          <p style={{ fontSize: 12.5, color: '#64748B', margin: '2px 0 0' }}>
+            Procedural status diagnosis, chronological case milestones, and verified statutory escalations.
+          </p>
+        </div>
 
-              <div style={{ ...portalTheme.containers.sectionCard, padding: 14 }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
-                  Active Investigations
-                </span>
-                <div style={{ fontSize: 24, fontWeight: 800, color: '#0284C7', marginTop: 4 }}>
-                  {cases.filter(c => c.status === 'investigation').length}
-                </div>
-                <div style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>Assigned police stations</div>
-              </div>
+        {/* 3-Pillar Tab Switcher (Zero emojis, minimalist clean) */}
+        <div
+          style={{
+            display: 'flex',
+            background: '#F1F5F9',
+            padding: 3,
+            borderRadius: 8,
+            border: '1px solid #E2E8F0',
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setActiveTab('cases')}
+            style={{
+              padding: '6px 14px',
+              borderRadius: 6,
+              border: 'none',
+              background: activeTab === 'cases' ? '#FFFFFF' : 'transparent',
+              color: activeTab === 'cases' ? '#0F172A' : '#64748B',
+              fontWeight: activeTab === 'cases' ? 700 : 600,
+              fontSize: 12.5,
+              cursor: 'pointer',
+              boxShadow: activeTab === 'cases' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
+              transition: 'all 120ms ease',
+            }}
+          >
+            All Complaints ({casesList.length})
+          </button>
 
-              <div style={{ ...portalTheme.containers.sectionCard, padding: 14 }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#DC2626', textTransform: 'uppercase' }}>
-                  Urgent Attention
-                </span>
-                <div style={{ fontSize: 24, fontWeight: 800, color: '#DC2626', marginTop: 4 }}>
-                  {attentionCases.length}
-                </div>
-                <div style={{ fontSize: 11, color: '#991B1B', marginTop: 2 }}>Pending citizen action</div>
-              </div>
+          <button
+            type="button"
+            onClick={() => setActiveTab('tracking')}
+            style={{
+              padding: '6px 14px',
+              borderRadius: 6,
+              border: 'none',
+              background: activeTab === 'tracking' ? '#FFFFFF' : 'transparent',
+              color: activeTab === 'tracking' ? '#0F172A' : '#64748B',
+              fontWeight: activeTab === 'tracking' ? 700 : 600,
+              fontSize: 12.5,
+              cursor: 'pointer',
+              boxShadow: activeTab === 'tracking' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
+              transition: 'all 120ms ease',
+            }}
+          >
+            Tracking & Timeline
+          </button>
 
-              <div style={{ ...portalTheme.containers.sectionCard, padding: 14 }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
-                  Restitution / Holds
-                </span>
-                <div style={{ fontSize: 24, fontWeight: 800, color: '#15803D', marginTop: 4 }}>
-                  ₹52,000
-                </div>
-                <div style={{ fontSize: 11, color: '#15803D', marginTop: 2 }}>Frozen in suspect accounts</div>
-              </div>
-            </div>
+          <button
+            type="button"
+            onClick={() => setActiveTab('actions')}
+            style={{
+              padding: '6px 14px',
+              borderRadius: 6,
+              border: 'none',
+              background: activeTab === 'actions' ? '#FFFFFF' : 'transparent',
+              color: activeTab === 'actions' ? '#0F766E' : '#64748B',
+              fontWeight: activeTab === 'actions' ? 700 : 600,
+              fontSize: 12.5,
+              cursor: 'pointer',
+              boxShadow: activeTab === 'actions' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
+              transition: 'all 120ms ease',
+            }}
+          >
+            Escalations & Actions
+          </button>
+        </div>
+      </div>
 
-            {/* Filter and Search Bar */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, maxWidth: 380 }}>
+      {/* ── Case Selector Strip (Tracking & Actions tabs) ── */}
+      {activeTab !== 'cases' && (
+        <div
+          style={{
+            background: '#FFFFFF',
+            borderBottom: '1px solid #E2E8F0',
+            padding: '8px 32px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            overflowX: 'auto',
+          }}
+        >
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>
+            Active Case:
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'nowrap' }}>
+            {casesList.map(c => {
+              const b = getHealthBadge(c.health);
+              const isSelected = c.id === activeCase?.id;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => onSelectCaseId(c.id)}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: 6,
+                    border: `1px solid ${isSelected ? '#0F766E' : '#E2E8F0'}`,
+                    background: isSelected ? '#F0FDFA' : '#FFFFFF',
+                    color: isSelected ? '#0F766E' : '#334155',
+                    fontSize: 12,
+                    fontWeight: isSelected ? 700 : 500,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: b.dotColor }} />
+                  <span>{c.id}</span>
+                  <span style={{ fontSize: 10.5, color: '#64748B' }}>({c.subtype.split('/')[0].trim()})</span>
+                  <span
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      padding: '1px 5px',
+                      borderRadius: 3,
+                      background: b.bg,
+                      color: b.color,
+                    }}
+                  >
+                    {c.health}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Main Content Container ── */}
+      <div style={{ maxWidth: 1080, width: '100%', margin: '0 auto', padding: '24px 32px 64px' }}>
+
+        {/* ═══════════════════════════════════════════════════════════════════
+            PILLAR 1: ALL CASE COMPLAINTS
+           ═══════════════════════════════════════════════════════════════════ */}
+        {activeTab === 'cases' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Filter Bar */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: 12,
+                background: '#FFFFFF',
+                border: '1px solid #E2E8F0',
+                borderRadius: 10,
+                padding: '10px 16px',
+              }}
+            >
+              <div style={{ position: 'relative', flex: 1, minWidth: 240, maxWidth: 360 }}>
+                <span style={{ position: 'absolute', left: 10, top: 9, color: '#94A3B8', pointerEvents: 'none' }}>
+                  <Icons.SearchActivity />
+                </span>
                 <input
                   type="text"
+                  placeholder="Filter by Case ID, NCRP Token, Crime type..."
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
-                  placeholder="Search by Case ID, NCRP Token, Crime type, State..."
                   style={{
                     width: '100%',
-                    padding: '8px 14px',
-                    borderRadius: 8,
+                    padding: '6px 10px 6px 32px',
+                    borderRadius: 6,
                     border: '1px solid #CBD5E1',
                     fontSize: 12.5,
+                    color: '#0F172A',
                     outline: 'none',
-                    fontFamily: "'Manrope', Helvetica, sans-serif",
+                    fontFamily: 'inherit',
                   }}
                 />
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                {(['all', 'investigation', 'assigned', 'attention'] as const).map(stage => {
-                  const isActive = stageFilter === stage;
-                  const labelMap = {
-                    all: 'All Stages',
-                    investigation: 'Investigation',
-                    assigned: 'Assigned',
-                    attention: 'Needs Action',
-                  };
-                  return (
-                    <button
-                      key={stage}
-                      type="button"
-                      onClick={() => setStageFilter(stage)}
-                      style={{
-                        padding: '6px 12px',
-                        borderRadius: 6,
-                        border: '1px solid',
-                        borderColor: isActive ? '#0F172A' : '#E2E8F0',
-                        background: isActive ? '#0F172A' : '#FFFFFF',
-                        color: isActive ? '#FFFFFF' : '#475569',
-                        fontSize: 12,
-                        fontWeight: isActive ? 700 : 500,
-                        cursor: 'pointer',
-                        transition: 'all 120ms ease',
-                      }}
-                    >
-                      {labelMap[stage]}
-                    </button>
-                  );
-                })}
+                <span style={{ fontSize: 11.5, fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>Health:</span>
+                {(['All', 'Urgent', 'Attention Required', 'Waiting', 'On Track'] as const).map(hf => (
+                  <button
+                    key={hf}
+                    type="button"
+                    onClick={() => setHealthFilter(hf)}
+                    style={{
+                      padding: '4px 9px',
+                      borderRadius: 5,
+                      fontSize: 11.5,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      border: healthFilter === hf ? '1px solid #0F766E' : '1px solid #E2E8F0',
+                      background: healthFilter === hf ? '#0F766E' : '#FFFFFF',
+                      color: healthFilter === hf ? '#FFFFFF' : '#475569',
+                    }}
+                  >
+                    {hf}
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* Case List Table */}
-            <div style={portalTheme.containers.sectionCard}>
-              <div style={portalTheme.containers.cardHeader}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontSize: 13.5, fontWeight: 700, color: '#0F172A' }}>
-                    Registered Cases Dossier
-                  </span>
-                  <span style={{ fontSize: 11, fontWeight: 700, background: '#F1F5F9', color: '#334155', padding: '2px 8px', borderRadius: 12 }}>
-                    {filteredCases.length}
-                  </span>
-                </div>
-                <span style={{ fontSize: 11.5, color: '#64748B' }}>
-                  Click row to inspect active case file or click action buttons to execute next step
-                </span>
-              </div>
-
-              <div style={{ overflowX: 'auto' }}>
-                <table style={portalTheme.table.table}>
-                  <thead>
-                    <tr style={portalTheme.table.theadRow}>
-                      <th style={{ ...portalTheme.table.th, width: '22%' }}>Case Number & Ack</th>
-                      <th style={{ ...portalTheme.table.th, width: '26%' }}>Classification & Subtype</th>
-                      <th style={{ ...portalTheme.table.th, width: '16%' }}>Key Impact</th>
-                      <th style={{ ...portalTheme.table.th, width: '16%' }}>Current Stage</th>
-                      <th style={{ ...portalTheme.table.th, width: '20%' }}>Next Action Trigger</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredCases.map(c => {
-                      const isSelected = c.id === selectedCase?.id;
-                      const nextAction = (c.nextActions && c.nextActions[0]) || {
-                        id: 'inspect',
-                        title: 'Inspect Case',
-                        type: 'inspect',
-                        actionLabel: 'Inspect File',
-                      };
-
-                      return (
-                        <tr
-                          key={c.id}
-                          onClick={() => onSelectCaseId(c.id)}
-                          style={{
-                            background: isSelected ? '#F0FDFA' : '#FFFFFF',
-                            borderBottom: '1px solid #F1F5F9',
-                            cursor: 'pointer',
-                            transition: 'background 120ms ease',
-                          }}
-                        >
-                          <td style={{ ...portalTheme.table.td, fontWeight: 700, fontFamily: 'monospace', color: '#0F172A' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                              <span>{c.id}</span>
-                              {isSelected && (
-                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#0F766E' }} />
-                              )}
-                            </div>
-                            <div style={{ fontSize: 10.5, color: '#64748B', fontWeight: 500, fontFamily: 'sans-serif', marginTop: 2 }}>
-                              {c.ackNumber || 'Token pending'}
-                            </div>
-                          </td>
-
-                          <td style={portalTheme.table.td}>
-                            <div style={{ fontWeight: 600, color: '#0F172A' }}>{c.primaryCrimeType.replace(/_/g, ' ')}</div>
-                            <div style={{ fontSize: 11.5, color: '#64748B' }}>{c.subtype}</div>
-                          </td>
-
-                          <td style={{ ...portalTheme.table.td, fontWeight: 700 }}>
-                            {c.financial ? (
-                              <span style={{ color: '#B91C1C' }}>₹{c.financial.amount}</span>
-                            ) : c.social ? (
-                              <span style={{ color: '#0F766E' }}>{c.social.platform}</span>
-                            ) : c.device ? (
-                              <span style={{ color: '#D97706' }}>{c.device.ransomExtension}</span>
-                            ) : (
-                              <span style={{ color: '#64748B' }}>Non-financial</span>
-                            )}
-                          </td>
-
-                          <td style={portalTheme.table.td}>
-                            <span
-                              style={{
-                                fontSize: 10.5,
-                                fontWeight: 700,
-                                padding: '2px 7px',
-                                borderRadius: 4,
-                                background: c.needsAttention ? '#FEF2F2' : '#DCFCE7',
-                                color: c.needsAttention ? '#DC2626' : '#15803D',
-                                border: c.needsAttention ? '1px solid #FECACA' : '1px solid #BBF7D0',
-                              }}
-                            >
-                              {c.status.toUpperCase()}
-                            </span>
-                          </td>
-
-                          <td style={portalTheme.table.td} onClick={e => e.stopPropagation()}>
-                            <button
-                              type="button"
-                              onClick={() => handleActionClick(nextAction.type, c)}
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: 6,
-                                padding: '6px 12px',
-                                borderRadius: 6,
-                                border: 'none',
-                                background: c.needsAttention ? '#DC2626' : '#0F766E',
-                                color: '#FFFFFF',
-                                fontSize: 11.5,
-                                fontWeight: 700,
-                                cursor: 'pointer',
-                                transition: 'transform 100ms ease, opacity 100ms ease',
-                                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                              }}
-                              onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
-                              onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
-                            >
-                              <span>{nextAction.actionLabel}</span>
-                              <span style={{ fontSize: 10 }}>→</span>
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Active Case Inspector Card */}
-            {selectedCase && (
-              <div style={portalTheme.containers.sectionCard}>
-                <div style={portalTheme.containers.cardHeader}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: '#64748B', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-                      Active Case File
-                    </span>
-                    <span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 14, color: '#0F172A' }}>
-                      {selectedCase.id}
-                    </span>
-                    {selectedCase.isAnonymous && (
-                      <span style={{ fontSize: 11, background: '#EDE9FE', color: '#6D28D9', padding: '1px 7px', borderRadius: 4, fontWeight: 700 }}>
-                        🔒 100% Anonymous Report
-                      </span>
-                    )}
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <button
-                      type="button"
-                      onClick={() => setShowReceiptModal(true)}
-                      style={{
-                        padding: '5px 12px',
-                        borderRadius: 6,
-                        border: '1px solid #CBD5E1',
-                        background: '#FFFFFF',
-                        color: '#334155',
-                        fontSize: 12,
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Formal Receipt Slip
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEscalateCaseId(selectedCase.id);
-                        setTrackSubTab('escalation');
-                      }}
-                      style={{
-                        padding: '5px 12px',
-                        borderRadius: 6,
-                        border: 'none',
-                        background: '#DC2626',
-                        color: '#FFFFFF',
-                        fontSize: 12,
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Escalate to Nodal DSP →
-                    </button>
-                  </div>
-                </div>
-
-                <div style={portalTheme.containers.cardBody}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 14 }}>
-                    <div>
-                      <div style={{ fontSize: 11, color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>Crime Classification</div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A', marginTop: 3 }}>{selectedCase.primaryCrimeType.replace(/_/g, ' ')}</div>
-                      <div style={{ fontSize: 11.5, color: '#64748B' }}>{selectedCase.subtype}</div>
-                    </div>
-
-                    {selectedCase.financial ? (
-                      <div>
-                        <div style={{ fontSize: 11, color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>Disputed Amount</div>
-                        <div style={{ fontSize: 14, fontWeight: 800, color: '#B91C1C', marginTop: 3 }}>₹{selectedCase.financial.amount}</div>
-                        <div style={{ fontSize: 11, color: '#64748B' }}>UTR: {selectedCase.financial.utr || 'Pending'}</div>
-                      </div>
-                    ) : selectedCase.social ? (
-                      <div>
-                        <div style={{ fontSize: 11, color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>Affected Platform</div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A', marginTop: 3 }}>{selectedCase.social.platform}</div>
-                        <div style={{ fontSize: 11, color: '#0F766E', fontWeight: 600 }}>Handle: {selectedCase.social.offenderHandle}</div>
-                      </div>
-                    ) : selectedCase.device ? (
-                      <div>
-                        <div style={{ fontSize: 11, color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>Device & Ransom</div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: '#B91C1C', marginTop: 3 }}>{selectedCase.device.ransomExtension}</div>
-                        <div style={{ fontSize: 11, color: '#64748B' }}>{selectedCase.device.ransomDemand}</div>
-                      </div>
-                    ) : (
-                      <div>
-                        <div style={{ fontSize: 11, color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>Communication</div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A', marginTop: 3 }}>{selectedCase.communication?.channel || 'Online Platform'}</div>
-                        <div style={{ fontSize: 11, color: '#64748B' }}>Safety Concern: {selectedCase.communication?.immediateSafetyConcern === 'yes' ? 'Urgent' : 'Standard'}</div>
-                      </div>
-                    )}
-
-                    <div>
-                      <div style={{ fontSize: 11, color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>Filing Date & State</div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#0F172A', marginTop: 3 }}>{selectedCase.incident.date}</div>
-                      <div style={{ fontSize: 11.5, color: '#64748B' }}>{selectedCase.incident.state} ({selectedCase.incident.district})</div>
-                    </div>
-
-                    <div>
-                      <div style={{ fontSize: 11, color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>NCRP Ack Number</div>
-                      <div style={{ fontSize: 12.5, fontWeight: 700, fontFamily: 'monospace', color: '#0F766E', marginTop: 3 }}>
-                        {selectedCase.ackNumber || 'Generating...'}
-                      </div>
-                      <div style={{ fontSize: 11, color: '#15803D' }}>Digital Signature: Verified</div>
-                    </div>
-                  </div>
-
-                  <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: 12 }}>
-                    <div style={{ fontSize: 11, color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>Complainant Incident Statement</div>
-                    <p style={{ fontSize: 12.5, color: '#334155', lineHeight: 1.5, marginTop: 4 }}>
-                      {selectedCase.incident.description || 'No statement entered.'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-
-        {/* ══════════════════════════════════════════════════════════════
-            SUBTAB 2: NEEDS ATTENTION
-           ══════════════════════════════════════════════════════════════ */}
-        {trackSubTab === 'attention' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div
-              style={{
-                padding: '16px 20px',
-                background: '#FEF2F2',
-                border: '1px solid #FECACA',
-                borderRadius: 12,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span style={{ color: '#DC2626' }}>
-                  <Icons.AlertTriangle />
-                </span>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 800, color: '#991B1B' }}>
-                    {attentionCases.length} Case(s) Require Your Action
-                  </div>
-                  <div style={{ fontSize: 12, color: '#B91C1C', marginTop: 2 }}>
-                    Deadlines for inter-bank holds, malware scan log audits, or platform compliance queries.
-                  </div>
-                </div>
-              </div>
-              <a
-                href="tel:1930"
-                style={{
-                  padding: '7px 16px',
-                  borderRadius: 6,
-                  background: '#DC2626',
-                  color: '#FFFFFF',
-                  textDecoration: 'none',
-                  fontWeight: 700,
-                  fontSize: 12.5,
-                }}
-              >
-                1930 Golden Helpline
-              </a>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
-              {attentionCases.map(c => {
-                const nextAction = (c.nextActions && c.nextActions[0]) || {
-                  id: 'inspect',
-                  title: 'Action Needed',
-                  type: 'inspect',
-                  actionLabel: 'Take Action',
-                };
-
+            {/* Complaints List */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {filteredCases.map(c => {
+                const b = getHealthBadge(c.health);
+                const isSelected = c.id === activeCase?.id;
                 return (
                   <div
                     key={c.id}
                     style={{
-                      ...portalTheme.containers.sectionCard,
-                      borderLeft: '4px solid #DC2626',
-                      padding: 18,
+                      background: '#FFFFFF',
+                      border: isSelected ? '1.5px solid #0F766E' : '1px solid #E2E8F0',
+                      borderRadius: 10,
+                      padding: '18px 20px',
                       display: 'flex',
                       flexDirection: 'column',
-                      justifyContent: 'space-between',
-                      gap: 14,
+                      gap: 12,
+                      boxShadow: '0 1px 2px rgba(15, 23, 42, 0.03)',
                     }}
                   >
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 13, color: '#0F172A' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ fontSize: 15, fontWeight: 800, color: '#0F172A' }}>
                           {c.id}
                         </span>
-                        <span style={{ fontSize: 11, background: '#FEE2E2', color: '#B91C1C', padding: '2px 8px', borderRadius: 4, fontWeight: 700 }}>
-                          CRITICAL ACTION
-                        </span>
+                        {c.ackNumber && (
+                          <span
+                            style={{
+                              fontSize: 11.5,
+                              fontWeight: 600,
+                              color: '#0F766E',
+                              background: '#F0FDFA',
+                              border: '1px solid #CCFBF1',
+                              padding: '1px 6px',
+                              borderRadius: 4,
+                              fontFamily: 'monospace',
+                            }}
+                          >
+                            {c.ackNumber}
+                          </span>
+                        )}
                       </div>
 
-                      <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', marginTop: 8 }}>
-                        {c.primaryCrimeType.replace(/_/g, ' ')} • {c.subtype}
+                      <div
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          background: b.bg,
+                          border: `1px solid ${b.border}`,
+                          color: b.color,
+                          padding: '3px 10px',
+                          borderRadius: 4,
+                          fontSize: 11.5,
+                          fontWeight: 700,
+                        }}
+                      >
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: b.dotColor }} />
+                        <span>{c.health}</span>
                       </div>
-
-                      <div style={{ fontSize: 12, color: '#475569', marginTop: 6, lineHeight: 1.4 }}>
-                        <strong>Required:</strong> {nextAction.description || nextAction.title}
-                      </div>
-
-                      {c.financial && (
-                        <div style={{ fontSize: 12, color: '#B91C1C', fontWeight: 700, marginTop: 6 }}>
-                          Disputed Funds: ₹{c.financial.amount} (UTR: {c.financial.utr})
-                        </div>
-                      )}
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #F1F5F9', paddingTop: 12 }}>
-                      <span style={{ fontSize: 11, color: '#64748B' }}>
-                        Jurisdiction: {c.incident.state}
-                      </span>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, fontSize: 12.5 }}>
+                      <div>
+                        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#94A3B8' }}>Subtype</div>
+                        <div style={{ fontWeight: 700, color: '#1E293B', marginTop: 1 }}>{c.subtype}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#94A3B8' }}>Jurisdiction</div>
+                        <div style={{ fontWeight: 500, color: '#475569', marginTop: 1 }}>
+                          {c.incident.district}, {c.incident.state} ({c.incident.date})
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#94A3B8' }}>Financial Loss</div>
+                        <div style={{ fontWeight: 700, color: c.financial?.lostMoney ? '#B91C1C' : '#0F766E', marginTop: 1 }}>
+                          {c.financial?.lostMoney ? `INR ${c.financial.amount}` : 'Non-financial'}
+                        </div>
+                      </div>
+                    </div>
 
+                    <div
+                      style={{
+                        background: '#F8FAFC',
+                        border: '1px solid #F1F5F9',
+                        borderRadius: 6,
+                        padding: '8px 12px',
+                        fontSize: 12,
+                        color: '#475569',
+                      }}
+                    >
+                      <strong style={{ color: '#0F172A' }}>Status Note:</strong> {c.healthReason || c.incident.description.slice(0, 160)}
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, borderTop: '1px solid #F1F5F9', paddingTop: 10 }}>
                       <button
                         type="button"
-                        onClick={() => handleActionClick(nextAction.type, c)}
+                        onClick={() => {
+                          onSelectCaseId(c.id);
+                          setActiveTab('tracking');
+                        }}
                         style={{
-                          padding: '7px 14px',
+                          padding: '6px 12px',
                           borderRadius: 6,
-                          border: 'none',
-                          background: '#DC2626',
-                          color: '#FFFFFF',
-                          fontWeight: 700,
+                          border: '1px solid #CBD5E1',
+                          background: '#FFFFFF',
+                          color: '#334155',
                           fontSize: 12,
+                          fontWeight: 700,
                           cursor: 'pointer',
                         }}
                       >
-                        {nextAction.actionLabel} →
+                        Inspect Timeline
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onSelectCaseId(c.id);
+                          setActiveTab('actions');
+                        }}
+                        style={{
+                          padding: '6px 14px',
+                          borderRadius: 6,
+                          border: 'none',
+                          background: '#0F766E',
+                          color: '#FFFFFF',
+                          fontSize: 12,
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Take Action / Escalate →
                       </button>
                     </div>
                   </div>
@@ -685,646 +641,1142 @@ export function TrackCasePortalView({
           </div>
         )}
 
-        {/* ══════════════════════════════════════════════════════════════
-            SUBTAB 3: WORKFLOW & MILESTONES
-           ══════════════════════════════════════════════════════════════ */}
-        {trackSubTab === 'timeline' && selectedCase && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {/* In-Tab Case Selector Bar */}
+        {/* ═══════════════════════════════════════════════════════════════════
+            PILLAR 2: TRACKING & ELABORATED TIMELINE
+           ═══════════════════════════════════════════════════════════════════ */}
+        {activeTab === 'tracking' && activeCase && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {/* Status & Diagnostic Header Card */}
+            {(() => {
+              const b = getHealthBadge(activeCase.health);
+              return (
+                <div
+                  style={{
+                    background: '#FFFFFF',
+                    border: '1px solid #E2E8F0',
+                    borderRadius: 12,
+                    padding: '20px 24px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 16,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#64748B', letterSpacing: '0.04em' }}>
+                        Case File: {activeCase.id}
+                      </div>
+                      <h2 style={{ fontSize: 18, fontWeight: 800, color: '#0F172A', margin: '2px 0 0' }}>
+                        {activeCase.subtype}
+                      </h2>
+                    </div>
+
+                    <div
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        background: b.bg,
+                        border: `1px solid ${b.border}`,
+                        color: b.color,
+                        padding: '5px 14px',
+                        borderRadius: 6,
+                        fontSize: 12.5,
+                        fontWeight: 700,
+                      }}
+                    >
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: b.dotColor }} />
+                      <span>Health: {activeCase.health}</span>
+                    </div>
+                  </div>
+
+                  {/* 3 Reality Fields */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
+                    <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 8, padding: '12px 14px' }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#0F766E' }}>
+                        Verified Current State
+                      </div>
+                      <p style={{ fontSize: 12.5, color: '#1E293B', margin: '4px 0 0', lineHeight: 1.5 }}>
+                        {activeCase.events[0]?.desc || 'Complaint registered.'}
+                      </p>
+                    </div>
+
+                    <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 8, padding: '12px 14px' }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#B45309' }}>
+                        Procedural Context
+                      </div>
+                      <p style={{ fontSize: 12.5, color: '#78350F', margin: '4px 0 0', lineHeight: 1.5 }}>
+                        {activeCase.healthReason}
+                      </p>
+                    </div>
+
+                    <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 8, padding: '12px 14px' }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#475569' }}>
+                        Inquiry Stagnation
+                      </div>
+                      <p style={{ fontSize: 12.5, color: '#334155', margin: '4px 0 0', lineHeight: 1.5 }}>
+                        {activeCase.daysStagnant === 0
+                          ? 'Activity logged today. Investigation active.'
+                          : `${activeCase.daysStagnant} days elapsed since last officially recorded station action.`}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Elaborated Chronological Timeline */}
             <div
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12,
-                padding: '12px 18px',
-                background: '#F8FAFC',
+                background: '#FFFFFF',
                 border: '1px solid #E2E8F0',
-                borderRadius: 10,
+                borderRadius: 12,
+                padding: '22px 24px',
               }}
             >
-              <span style={{ fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>
-                Inspect Case Workflow:
-              </span>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                {cases.map(c => {
-                  const isSel = c.id === selectedCase.id;
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: 12,
+                  paddingBottom: 16,
+                  borderBottom: '1px solid #F1F5F9',
+                  marginBottom: 20,
+                }}
+              >
+                <div>
+                  <h3 style={{ fontSize: 16, fontWeight: 800, color: '#0F172A', margin: 0 }}>
+                    Chronological Investigation Timeline & Audit Trail
+                  </h3>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4 }}>
+                    <span style={{ fontSize: 11, color: '#0369A1', fontWeight: 600 }}>● Officially Recorded</span>
+                    <span style={{ fontSize: 11, color: '#0F766E', fontWeight: 600 }}>● Citizen Reported</span>
+                    <span style={{ fontSize: 11, color: '#64748B', fontWeight: 600 }}>● Procedural Assessment</span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowLogFollowUpModal(true)}
+                  style={{
+                    padding: '7px 14px',
+                    borderRadius: 6,
+                    border: '1px solid #0F766E',
+                    background: '#F0FDFA',
+                    color: '#0F766E',
+                    fontSize: 12.5,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
+                >
+                  <Icons.Plus /> Log Follow-up Activity
+                </button>
+              </div>
+
+              {/* Elaborated Steps */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16, position: 'relative', paddingLeft: 22 }}>
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: 6,
+                    top: 12,
+                    bottom: 12,
+                    width: 2,
+                    background: '#E2E8F0',
+                  }}
+                />
+
+                {activeCase.events.map((ev, idx) => {
+                  let badgeLabel = 'OFFICIAL RECORD';
+                  let badgeColor = '#0369A1';
+                  let badgeBg = '#F0F9FF';
+                  let badgeBorder = '#BAE6FD';
+
+                  if (ev.source === 'user_reported') {
+                    badgeLabel = 'CITIZEN REPORTED';
+                    badgeColor = '#0F766E';
+                    badgeBg = '#F0FDFA';
+                    badgeBorder = '#CCFBF1';
+                  } else if (ev.source === 'casepilot_assessment') {
+                    badgeLabel = 'PROCEDURAL ASSESSMENT';
+                    badgeColor = '#475569';
+                    badgeBg = '#F8FAFC';
+                    badgeBorder = '#E2E8F0';
+                  }
+
                   return (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => onSelectCaseId(c.id)}
+                    <div
+                      key={ev.id || idx}
                       style={{
-                        padding: '5px 12px',
-                        borderRadius: 6,
-                        border: '1px solid',
-                        borderColor: isSel ? '#0F766E' : '#CBD5E1',
-                        background: isSel ? '#0F766E' : '#FFFFFF',
-                        color: isSel ? '#FFFFFF' : '#334155',
-                        fontSize: 11.5,
-                        fontWeight: isSel ? 700 : 500,
-                        cursor: 'pointer',
+                        position: 'relative',
                         display: 'flex',
-                        alignItems: 'center',
+                        flexDirection: 'column',
                         gap: 6,
+                        background: '#FAFAFA',
+                        border: '1px solid #E2E8F0',
+                        borderRadius: 8,
+                        padding: '14px 16px',
                       }}
                     >
-                      <span>{c.id}</span>
-                      <span style={{ opacity: 0.8, fontSize: 10 }}>({c.primaryCrimeType.split('_')[0]})</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+                      {/* Node circle */}
+                      <div
+                        style={{
+                          position: 'absolute',
+                          left: -22,
+                          top: 14,
+                          width: 14,
+                          height: 14,
+                          borderRadius: '50%',
+                          background: badgeColor,
+                          border: '2px solid #FFFFFF',
+                          boxShadow: '0 0 0 1px #CBD5E1',
+                        }}
+                      />
 
-            {/* Crime Pipeline Tracker */}
-            <div style={portalTheme.containers.sectionCard}>
-              <div style={portalTheme.containers.cardHeader}>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>
-                    Crime-Specific Statutory Investigation Pipeline
-                  </div>
-                  <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
-                    NCRP & IT Act procedural milestones for Case {selectedCase.id} ({selectedCase.primaryCrimeType.replace(/_/g, ' ')})
-                  </div>
-                </div>
+                      {/* Header Line */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 800,
+                              padding: '2px 6px',
+                              borderRadius: 3,
+                              background: badgeBg,
+                              color: badgeColor,
+                              border: `1px solid ${badgeBorder}`,
+                              letterSpacing: '0.04em',
+                            }}
+                          >
+                            {badgeLabel}
+                          </span>
+                          <span style={{ fontSize: 13.5, fontWeight: 800, color: '#0F172A' }}>
+                            {ev.title}
+                          </span>
+                        </div>
+                        <span style={{ fontSize: 11.5, color: '#94A3B8', fontWeight: 600 }}>
+                          {ev.timestamp}
+                        </span>
+                      </div>
 
-                <div style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 4, background: '#F0FDFA', color: '#0F766E' }}>
-                  State: {selectedCase.incident.state} Desk
-                </div>
-              </div>
+                      {/* Narrative description */}
+                      <p style={{ fontSize: 12.5, color: '#334155', lineHeight: 1.55, margin: '2px 0 0' }}>
+                        {ev.desc}
+                      </p>
 
-              <div style={portalTheme.containers.cardBody}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  {(selectedCase.workflow || []).map((stage, idx) => {
-                    const isCompleted = stage.status === 'completed';
-                    const isCurrent = stage.status === 'current';
-
-                    return (
-                      <div key={stage.stageId} style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+                      {/* Elaborated Metadata Strip */}
+                      {(ev.stationOrAgency || ev.officerName || ev.referenceNumber || ev.statutorySection || ev.outcome) && (
                         <div
                           style={{
-                            width: 28,
-                            height: 28,
-                            borderRadius: '50%',
-                            background: isCompleted ? '#DCFCE7' : isCurrent ? '#0F766E' : '#F1F5F9',
-                            color: isCompleted ? '#15803D' : isCurrent ? '#FFFFFF' : '#94A3B8',
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'center',
-                            fontWeight: 700,
-                            fontSize: 12,
-                            flexShrink: 0,
-                            boxShadow: isCurrent ? '0 0 0 4px rgba(15, 118, 110, 0.15)' : 'none',
+                            flexWrap: 'wrap',
+                            gap: 12,
+                            marginTop: 4,
+                            paddingTop: 8,
+                            borderTop: '1px solid #E2E8F0',
+                            fontSize: 11.5,
+                            color: '#64748B',
                           }}
                         >
-                          {isCompleted ? '✓' : idx + 1}
+                          {ev.stationOrAgency && (
+                            <span><strong>Agency:</strong> {ev.stationOrAgency}</span>
+                          )}
+                          {ev.officerName && (
+                            <span><strong>Officer:</strong> {ev.officerName}</span>
+                          )}
+                          {ev.referenceNumber && (
+                            <span><strong>Ref:</strong> <code style={{ color: '#0F766E' }}>{ev.referenceNumber}</code></span>
+                          )}
+                          {ev.statutorySection && (
+                            <span><strong>Section:</strong> {ev.statutorySection}</span>
+                          )}
+                          {ev.outcome && (
+                            <span style={{ color: '#065F46', fontWeight: 700 }}><strong>Outcome:</strong> {ev.outcome}</span>
+                          )}
                         </div>
-
-                        <div style={{ flex: 1, paddingBottom: 14, borderBottom: idx < (selectedCase.workflow || []).length - 1 ? '1px solid #F1F5F9' : 'none' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                              <span style={{ fontSize: 13.5, fontWeight: 700, color: isCurrent ? '#0F766E' : '#0F172A' }}>
-                                {stage.label}
-                              </span>
-                              <span
-                                style={{
-                                  fontSize: 10,
-                                  fontWeight: 700,
-                                  padding: '1px 6px',
-                                  borderRadius: 4,
-                                  background: isCompleted ? '#DCFCE7' : isCurrent ? '#E0F2FE' : '#F1F5F9',
-                                  color: isCompleted ? '#15803D' : isCurrent ? '#0369A1' : '#64748B',
-                                }}
-                              >
-                                {isCompleted ? 'COMPLETED' : isCurrent ? 'IN PROGRESS' : 'UPCOMING'}
-                              </span>
-                            </div>
-
-                            {stage.date && (
-                              <span style={{ fontSize: 11, color: '#64748B', fontWeight: 600 }}>
-                                {stage.date}
-                              </span>
-                            )}
-                          </div>
-
-                          <div style={{ fontSize: 12, color: '#475569', marginTop: 4 }}>
-                            {stage.description}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
-            {/* Official Chronological Events Audit */}
-            <div style={portalTheme.containers.sectionCard}>
-              <div style={portalTheme.containers.cardHeader}>
-                <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0F172A' }}>
-                  Statutory Audit Log & Police Dispatch Events
-                </div>
-                <span style={{ fontSize: 11.5, color: '#64748B' }}>
-                  Cryptographically timestamped action logs
-                </span>
-              </div>
-
-              <div style={portalTheme.containers.cardBody}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {(selectedCase.events || []).map(ev => (
-                    <div
-                      key={ev.id}
-                      style={{
-                        padding: '10px 14px',
-                        background: '#F8FAFC',
-                        borderRadius: 6,
-                        border: '1px solid #E2E8F0',
-                        display: 'flex',
-                        alignItems: 'flex-start',
-                        gap: 12,
-                      }}
-                    >
-                      <span style={{ fontSize: 11, fontWeight: 700, color: '#64748B', minWidth: 90, marginTop: 1 }}>
-                        {ev.timestamp}
-                      </span>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 12.5, fontWeight: 700, color: '#0F172A' }}>{ev.title}</div>
-                        <div style={{ fontSize: 12, color: '#475569', marginTop: 2 }}>{ev.desc}</div>
-                      </div>
-                      <span
-                        style={{
-                          fontSize: 10,
-                          fontWeight: 700,
-                          textTransform: 'uppercase',
-                          color: ev.type === 'officer' ? '#0F766E' : ev.type === 'citizen' ? '#0284C7' : '#64748B',
-                        }}
-                      >
-                        {ev.type}
-                      </span>
+                      )}
                     </div>
-                  ))}
-                </div>
+                  );
+                })}
               </div>
             </div>
           </div>
         )}
 
-        {/* ══════════════════════════════════════════════════════════════
-            SUBTAB 4: ESCALATIONS & NODAL OFFICER
-           ══════════════════════════════════════════════════════════════ */}
-        {trackSubTab === 'escalation' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-            {/* Escalation Header */}
+        {/* ═══════════════════════════════════════════════════════════════════
+            PILLAR 3: "WHAT CAN I DO NOW?" & ESCALATIONS
+           ═══════════════════════════════════════════════════════════════════ */}
+        {activeTab === 'actions' && activeCase && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {/* Formal Escalation Pack Banner */}
             <div
               style={{
-                padding: '16px 20px',
-                background: '#FEF2F2',
-                border: '1px solid #FECACA',
-                borderRadius: 12,
+                background: '#0F766E',
+                color: '#FFFFFF',
+                borderRadius: 10,
+                padding: '18px 22px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: 16,
               }}
             >
               <div>
-                <div style={{ fontSize: 14.5, fontWeight: 800, color: '#991B1B' }}>
-                  State Cyber Crime Nodal Desk Grievance Escalation
+                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#99F6E4' }}>
+                  Formal Requisition Pack
                 </div>
-                <div style={{ fontSize: 12, color: '#7F1D1D', marginTop: 3 }}>
-                  Under NCRP provisions, citizens may elevate unresolved cases directly to the Supervisory DSP / SP Cyber Crime.
-                </div>
+                <h3 style={{ fontSize: 17, fontWeight: 800, margin: '4px 0 2px' }}>
+                  Prepare Follow-up & Grievance Dossier
+                </h3>
+                <p style={{ fontSize: 12.5, color: '#CCFBF1', margin: 0, maxWidth: 600 }}>
+                  Compiles a clean, formal legal petition with your NCRP acknowledgment number, investigation timeline, evidence hashes, and formal prayers under CrPC/IT Act for submission to the Station House Officer or State Nodal Officer.
+                </p>
               </div>
-              <span style={{ fontSize: 12, fontWeight: 700, color: '#DC2626', background: '#FFFFFF', padding: '4px 10px', borderRadius: 6, border: '1px solid #FECACA' }}>
-                Sec 91/156(3) IT Protocol
-              </span>
-            </div>
 
-            {/* Escalation Success Confirmation */}
-            {escalateSuccess && (
-              <div
+              <button
+                type="button"
+                onClick={() => {
+                  setCustomIssueNarrative(activeCase.healthReason || '');
+                  setCustomRequestedAction(
+                    activeCase.primaryCrimeType === 'FINANCIAL_FRAUD'
+                      ? 'Direct Investigating Officer to issue Section 91 CrPC notice to beneficiary bank to prevent expiry of lien marker.'
+                      : 'Provide written status of inquiry and issue Section 79 IT Act takedown directive.'
+                  );
+                  setShowEscalationModal(true);
+                }}
                 style={{
-                  padding: '16px 20px',
-                  background: '#DCFCE7',
-                  border: '1px solid #86EFAC',
-                  borderRadius: 10,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 6,
+                  padding: '9px 18px',
+                  borderRadius: 6,
+                  border: 'none',
+                  background: '#FFFFFF',
+                  color: '#0F766E',
+                  fontSize: 13,
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
                 }}
               >
-                <div style={{ fontSize: 14, fontWeight: 800, color: '#15803D' }}>
-                  ✓ Grievance Notice Formally Dispatched
-                </div>
-                <div style={{ fontSize: 12.5, color: '#166534' }}>
-                  Your escalation docket has been queued for review by the Supervisory Nodal Officer. Tracking Reference: <strong>{escalateSuccess}</strong>.
-                </div>
-              </div>
-            )}
+                Prepare Follow-up Dossier →
+              </button>
+            </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 18 }}>
-              {/* Left Column: Escalation Form */}
-              <div style={portalTheme.containers.sectionCard}>
-                <div style={portalTheme.containers.cardHeader}>
-                  <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0F172A' }}>
-                    Grievance Escalation Dossier Form
+            {/* Actions Grid */}
+            <div>
+              <div style={{ marginBottom: 12 }}>
+                <h3 style={{ fontSize: 16, fontWeight: 800, color: '#0F172A', margin: 0 }}>
+                  Legitimate Procedural Next Steps for Case {activeCase.id}
+                </h3>
+                <p style={{ fontSize: 12.5, color: '#64748B', margin: '2px 0 0' }}>
+                  Statutory routes based on current stage and crime classification.
+                </p>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(310px, 1fr))', gap: 14 }}>
+                {/* 1. Official NCRP Status */}
+                <div
+                  style={{
+                    background: '#FFFFFF',
+                    border: '1px solid #E2E8F0',
+                    borderRadius: 10,
+                    padding: '16px 18px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: 12,
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#0369A1', textTransform: 'uppercase' }}>
+                      Official Portal
+                    </div>
+                    <h4 style={{ fontSize: 14.5, fontWeight: 800, color: '#0F172A', margin: '4px 0 6px' }}>
+                      Check Official NCRP Status
+                    </h4>
+                    <p style={{ fontSize: 12.5, color: '#64748B', margin: 0, lineHeight: 1.5 }}>
+                      Verify official state police station assignment and investigation stage directly on cybercrime.gov.in.
+                    </p>
                   </div>
-                  <span style={{ fontSize: 11.5, color: '#64748B' }}>
-                    Select case file and specify reason for grievance
-                  </span>
+                  <button
+                    type="button"
+                    onClick={handleCheckOfficialNcrp}
+                    style={{
+                      padding: '7px 12px',
+                      borderRadius: 6,
+                      border: '1px solid #CBD5E1',
+                      background: '#FFFFFF',
+                      color: '#0369A1',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Open cybercrime.gov.in (Copies Token)
+                  </button>
                 </div>
 
-                <div style={portalTheme.containers.cardBody}>
-                  <form onSubmit={handleEscalateSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {/* 2. 1930 Helpline */}
+                {activeCase.primaryCrimeType === 'FINANCIAL_FRAUD' && (
+                  <div
+                    style={{
+                      background: '#FFFFFF',
+                      border: '1px solid #FECACA',
+                      borderRadius: 10,
+                      padding: '16px 18px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      gap: 12,
+                    }}
+                  >
                     <div>
-                      <label style={{ fontSize: 12, fontWeight: 700, color: '#334155', display: 'block', marginBottom: 4 }}>
-                        Target Case File *
-                      </label>
-                      <select
-                        value={escalateCaseId}
-                        onChange={e => {
-                          setEscalateCaseId(e.target.value);
-                          onSelectCaseId(e.target.value);
-                        }}
-                        style={{
-                          width: '100%',
-                          padding: '8px 12px',
-                          borderRadius: 6,
-                          border: '1px solid #CBD5E1',
-                          fontSize: 12.5,
-                          outline: 'none',
-                        }}
-                      >
-                        {cases.map(c => (
-                          <option key={c.id} value={c.id}>
-                            {c.id} ({c.primaryCrimeType.replace(/_/g, ' ')}) — {c.incident.state}
-                          </option>
-                        ))}
-                      </select>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#991B1B', textTransform: 'uppercase' }}>
+                        Helpline Action
+                      </div>
+                      <h4 style={{ fontSize: 14.5, fontWeight: 800, color: '#0F172A', margin: '4px 0 6px' }}>
+                        Dial 1930 Cyber Fraud Helpline
+                      </h4>
+                      <p style={{ fontSize: 12.5, color: '#64748B', margin: 0, lineHeight: 1.5 }}>
+                        Verify beneficiary bank lien marker status with Maharashtra Cyber Fraud Desk under CFCFRMS protocol.
+                      </p>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => setShow1930Modal(true)}
+                      style={{
+                        padding: '7px 12px',
+                        borderRadius: 6,
+                        border: 'none',
+                        background: '#DC2626',
+                        color: '#FFFFFF',
+                        fontSize: 12,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Dial 1930 Helpline (Toll Free)
+                    </button>
+                  </div>
+                )}
 
-                    <div>
-                      <label style={{ fontSize: 12, fontWeight: 700, color: '#334155', display: 'block', marginBottom: 4 }}>
-                        Primary Reason for Escalation *
-                      </label>
-                      <select
-                        value={grievanceCategory}
-                        onChange={e => setGrievanceCategory(e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '8px 12px',
-                          borderRadius: 6,
-                          border: '1px solid #CBD5E1',
-                          fontSize: 12.5,
-                          outline: 'none',
-                        }}
-                      >
-                        <option value="1930_delay">1930 Inter-bank hold delayed beyond Golden Hour</option>
-                        <option value="platform_takedown_failed">Social media intermediary failed 36-hour takedown under IT Rules</option>
-                        <option value="no_io_assigned">No Investigating Officer (IO) allocated after 7 days</option>
-                        <option value="extortion_threat">Suspect continuing active threats or blackmail</option>
-                        <option value="bank_dispute">Bank refusing chargeback despite verified NCRP token</option>
-                      </select>
+                {/* 3. Station Follow-up */}
+                <div
+                  style={{
+                    background: '#FFFFFF',
+                    border: '1px solid #E2E8F0',
+                    borderRadius: 10,
+                    padding: '16px 18px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: 12,
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#0F766E', textTransform: 'uppercase' }}>
+                      Station Unit
                     </div>
-
-                    <div>
-                      <label style={{ fontSize: 12, fontWeight: 700, color: '#334155', display: 'block', marginBottom: 4 }}>
-                        Grievance Statement & Timeline Narrative *
-                      </label>
-                      <textarea
-                        rows={4}
-                        required
-                        value={grievanceNarrative}
-                        onChange={e => setGrievanceNarrative(e.target.value)}
-                        placeholder="State clearly why police/nodal intervention is urgently requested (e.g. Beneficiary account balance still unverified; impersonation account still messaging contacts...)"
-                        style={{
-                          width: '100%',
-                          padding: '8px 12px',
-                          borderRadius: 6,
-                          border: '1px solid #CBD5E1',
-                          fontSize: 12.5,
-                          outline: 'none',
-                          fontFamily: "'Manrope', Helvetica, sans-serif",
-                        }}
-                      />
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
-                      <button
-                        type="submit"
-                        style={{
-                          padding: '9px 20px',
-                          borderRadius: 6,
-                          border: 'none',
-                          background: '#DC2626',
-                          color: '#FFFFFF',
-                          fontSize: 13,
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        Submit Grievance to State Nodal Officer →
-                      </button>
-                    </div>
-                  </form>
+                    <h4 style={{ fontSize: 14.5, fontWeight: 800, color: '#0F172A', margin: '4px 0 6px' }}>
+                      Follow up with Police Station
+                    </h4>
+                    <p style={{ fontSize: 12.5, color: '#64748B', margin: 0, lineHeight: 1.5 }}>
+                      Jurisdiction: Cyber Crime Cell {activeCase.incident.district}. Carry printed acknowledgment slip, certified bank statement, and ID proof.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowLogFollowUpModal(true)}
+                    style={{
+                      padding: '7px 12px',
+                      borderRadius: 6,
+                      border: '1px solid #CBD5E1',
+                      background: '#FFFFFF',
+                      color: '#0F766E',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Log Station Visit / Inquiry Call
+                  </button>
                 </div>
-              </div>
 
-              {/* Right Column: Jurisdiction Nodal Officer Card */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                {(() => {
-                  const targetCase = cases.find(c => c.id === escalateCaseId) || selectedCase;
-                  const nodal = getNodalOfficerForCase(targetCase);
-
-                  return (
-                    <div style={portalTheme.containers.sectionCard}>
-                      <div style={portalTheme.containers.cardHeader}>
-                        <div style={{ fontSize: 12.5, fontWeight: 700, color: '#0F172A' }}>
-                          Jurisdictional Nodal Officer
-                        </div>
-                        <span style={{ fontSize: 10.5, color: '#0F766E', fontWeight: 700 }}>
-                          {nodal.state}
-                        </span>
+                {/* 4. State Nodal Officer */}
+                {nodalEntry && (
+                  <div
+                    style={{
+                      background: '#FFFFFF',
+                      border: '1px solid #E2E8F0',
+                      borderRadius: 10,
+                      padding: '16px 18px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      gap: 12,
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#4338CA', textTransform: 'uppercase' }}>
+                        State Nodal Officer
                       </div>
-
-                      <div style={{ ...portalTheme.containers.cardBody, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        <div>
-                          <div style={{ fontSize: 13.5, fontWeight: 800, color: '#0F172A' }}>
-                            {nodal.officerName}
-                          </div>
-                          <div style={{ fontSize: 11.5, color: '#64748B', marginTop: 1 }}>
-                            {nodal.designation}
-                          </div>
-                        </div>
-
-                        <div style={{ fontSize: 11.5, color: '#334155', lineHeight: 1.4, borderTop: '1px solid #F1F5F9', paddingTop: 8 }}>
-                          <strong>Office Address:</strong>
-                          <div style={{ color: '#64748B', marginTop: 2 }}>{nodal.address}</div>
-                        </div>
-
-                        <div style={{ fontSize: 11.5, color: '#334155', borderTop: '1px solid #F1F5F9', paddingTop: 8 }}>
-                          <div><strong>Official Email:</strong> <a href={`mailto:${nodal.email}`} style={{ color: '#0F766E', textDecoration: 'none' }}>{nodal.email}</a></div>
-                          <div style={{ marginTop: 4 }}><strong>Helpline / Tel:</strong> <a href={`tel:${nodal.phone}`} style={{ color: '#0F766E', textDecoration: 'none' }}>{nodal.phone}</a></div>
-                        </div>
-
-                        <div style={{ fontSize: 10.5, color: '#64748B', background: '#F8FAFC', padding: 8, borderRadius: 6, marginTop: 4 }}>
-                          Submissions made here are sent through certified government channels to the DSP office for statutory supervision.
-                        </div>
+                      <h4 style={{ fontSize: 14.5, fontWeight: 800, color: '#0F172A', margin: '4px 0 2px' }}>
+                        {nodalEntry.officerName}
+                      </h4>
+                      <div style={{ fontSize: 11.5, color: '#475569', marginBottom: 4 }}>
+                        {nodalEntry.designation}
                       </div>
+                      <p style={{ fontSize: 12, color: '#64748B', margin: 0 }}>
+                        {nodalEntry.email} • {nodalEntry.phone}
+                      </p>
                     </div>
-                  );
-                })()}
+                    <button
+                      type="button"
+                      onClick={() => handleEmailNodalOfficer(nodalEntry)}
+                      style={{
+                        padding: '7px 12px',
+                        borderRadius: 6,
+                        border: '1px solid #C7D2FE',
+                        background: '#EEF2FF',
+                        color: '#4338CA',
+                        fontSize: 12,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Draft Email to Nodal Desk
+                    </button>
+                  </div>
+                )}
+
+                {/* 5. Bank Grievance & Ombudsman */}
+                {activeCase.primaryCrimeType === 'FINANCIAL_FRAUD' && (
+                  <div
+                    style={{
+                      background: '#FFFFFF',
+                      border: '1px solid #E2E8F0',
+                      borderRadius: 10,
+                      padding: '16px 18px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      gap: 12,
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#059669', textTransform: 'uppercase' }}>
+                        Banking Ombudsman
+                      </div>
+                      <h4 style={{ fontSize: 14.5, fontWeight: 800, color: '#0F172A', margin: '4px 0 6px' }}>
+                        Bank Grievance & Chargeback
+                      </h4>
+                      <p style={{ fontSize: 12.5, color: '#64748B', margin: 0, lineHeight: 1.5 }}>
+                        Submit formal dispute citing RBI Zero Liability circular for unauthorized digital transactions.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => window.open('https://cms.rbi.org.in', '_blank')}
+                      style={{
+                        padding: '7px 12px',
+                        borderRadius: 6,
+                        border: '1px solid #CBD5E1',
+                        background: '#FFFFFF',
+                        color: '#059669',
+                        fontSize: 12,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Open RBI CMS Portal
+                    </button>
+                  </div>
+                )}
+
+                {/* 6. CPGRAMS Portal */}
+                <div
+                  style={{
+                    background: '#FFFFFF',
+                    border: '1px solid #E2E8F0',
+                    borderRadius: 10,
+                    padding: '16px 18px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: 12,
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#7C3AED', textTransform: 'uppercase' }}>
+                      Central Public Grievance
+                    </div>
+                    <h4 style={{ fontSize: 14.5, fontWeight: 800, color: '#0F172A', margin: '4px 0 6px' }}>
+                      CPGRAMS Grievance Portal
+                    </h4>
+                    <p style={{ fontSize: 12.5, color: '#64748B', margin: 0, lineHeight: 1.5 }}>
+                      For administrative inaction, lodge a public grievance on pgportal.gov.in under Ministry of Home Affairs / CIS Division.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => window.open('https://pgportal.gov.in', '_blank')}
+                    style={{
+                      padding: '7px 12px',
+                      borderRadius: 6,
+                      border: '1px solid #CBD5E1',
+                      background: '#FFFFFF',
+                      color: '#7C3AED',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Open CPGRAMS (pgportal.gov.in)
+                  </button>
+                </div>
+
+                {/* 7. Judicial Remedy */}
+                <div
+                  style={{
+                    background: '#FFFFFF',
+                    border: '1px solid #E2E8F0',
+                    borderRadius: 10,
+                    padding: '16px 18px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: 12,
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#334155', textTransform: 'uppercase' }}>
+                      Judicial Remedy
+                    </div>
+                    <h4 style={{ fontSize: 14.5, fontWeight: 800, color: '#0F172A', margin: '4px 0 6px' }}>
+                      Section 156(3) CrPC / 175(3) BNSS
+                    </h4>
+                    <p style={{ fontSize: 12.5, color: '#64748B', margin: 0, lineHeight: 1.5 }}>
+                      If police fail to register an FIR for a cognizable cyber offence, citizens can petition the Judicial Magistrate through a qualified cyber advocate.
+                    </p>
+                  </div>
+                  <div style={{ fontSize: 11, color: '#94A3B8' }}>
+                    Note: CasePilot does not provide legal representation. Consult a qualified cyber advocate.
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         )}
       </div>
 
-      {/* ── Formal Receipt Modal ── */}
-      {showReceiptModal && selectedCase && (
+      {/* ── MODAL 1: LOG FOLLOW-UP ACTIVITY ── */}
+      {showLogFollowUpModal && activeCase && (
         <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setShowLogFollowUpModal(false)}
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(15, 23, 42, 0.6)',
+            background: 'rgba(15, 23, 42, 0.55)',
+            backdropFilter: 'blur(3px)',
+            zIndex: 9999,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 9999,
+            padding: 20,
           }}
         >
           <div
+            onClick={e => e.stopPropagation()}
             style={{
               background: '#FFFFFF',
               borderRadius: 12,
-              width: 560,
-              maxWidth: '90vw',
-              padding: '24px',
+              maxWidth: 500,
+              width: '100%',
+              boxShadow: '0 20px 40px rgba(15, 23, 42, 0.2)',
+              border: '1px solid #E2E8F0',
+              overflow: 'hidden',
               display: 'flex',
               flexDirection: 'column',
-              gap: 16,
-              boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #E2E8F0', paddingBottom: 12 }}>
-              <div style={{ fontSize: 15, fontWeight: 800, color: '#0F172A' }}>
-                National Cybercrime Reporting Portal • Acknowledgment Receipt
+            <div
+              style={{
+                padding: '16px 20px',
+                borderBottom: '1px solid #F1F5F9',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                background: '#F8FAFC',
+              }}
+            >
+              <div>
+                <h3 style={{ fontSize: 15.5, fontWeight: 800, color: '#0F172A', margin: 0 }}>
+                  Log Follow-up Activity
+                </h3>
+                <span style={{ fontSize: 11.5, color: '#0F766E', fontWeight: 600 }}>
+                  Case: {activeCase.id} ({activeCase.ackNumber || 'Inquiry'})
+                </span>
               </div>
               <button
                 type="button"
-                onClick={() => setShowReceiptModal(false)}
-                style={{ border: 'none', background: 'none', fontSize: 16, cursor: 'pointer', color: '#64748B' }}
+                onClick={() => setShowLogFollowUpModal(false)}
+                style={{ background: 'none', border: 'none', fontSize: 18, color: '#64748B', cursor: 'pointer' }}
               >
                 ✕
               </button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 12.5, color: '#334155' }}>
-              <div><strong>Complaint Number:</strong> {selectedCase.id}</div>
-              <div><strong>NCRP Token:</strong> {selectedCase.ackNumber}</div>
-              <div><strong>Crime Type:</strong> {selectedCase.primaryCrimeType} ({selectedCase.subtype})</div>
-              <div><strong>Occurrence Date:</strong> {selectedCase.incident.date}</div>
-              <div><strong>State Jurisdiction:</strong> {selectedCase.incident.state}</div>
-              {selectedCase.financial && <div><strong>Defrauded Amount:</strong> ₹{selectedCase.financial.amount} (UTR: {selectedCase.financial.utr})</div>}
-              <div style={{ fontSize: 11, color: '#64748B', marginTop: 8 }}>
-                This is a digitally generated acknowledgement slip recognized by banks under RBI Circular RBI/2021-22/86 for Golden Hour chargeback disputes.
+            <form onSubmit={handleSaveFollowUp} style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#475569', marginBottom: 4 }}>
+                  Activity Type
+                </label>
+                <select
+                  value={followUpActivity}
+                  onChange={e => setFollowUpActivity(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '7px 10px',
+                    borderRadius: 6,
+                    border: '1px solid #CBD5E1',
+                    fontSize: 12.5,
+                    color: '#0F172A',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  <option value="Visited Police Station">Visited Police Station in person</option>
+                  <option value="Spoke to Investigating Officer (IO)">Phone Call with Investigating Officer (IO)</option>
+                  <option value="Visited Bank Branch">Visited Bank Branch for Chargeback</option>
+                  <option value="Contacted Platform Grievance Officer">Emailed Platform Grievance Officer</option>
+                  <option value="Other Follow-up">Other Citizen Follow-up</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#475569', marginBottom: 4 }}>
+                    Officer / Contact Name
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Insp. K. Patil"
+                    value={followUpOfficer}
+                    onChange={e => setFollowUpOfficer(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '7px 10px',
+                      borderRadius: 6,
+                      border: '1px solid #CBD5E1',
+                      fontSize: 12.5,
+                      color: '#0F172A',
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#475569', marginBottom: 4 }}>
+                    Station / Agency / Branch
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Bandra Cyber Cell"
+                    value={followUpStation}
+                    onChange={e => setFollowUpStation(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '7px 10px',
+                      borderRadius: 6,
+                      border: '1px solid #CBD5E1',
+                      fontSize: 12.5,
+                      color: '#0F172A',
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#475569', marginBottom: 4 }}>
+                  Discussion Summary & Action Taken *
+                </label>
+                <textarea
+                  rows={4}
+                  placeholder="Record summary of discussion, documents requested, or instructions provided by the officer..."
+                  value={followUpNotes}
+                  onChange={e => setFollowUpNotes(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 10px',
+                    borderRadius: 6,
+                    border: '1px solid #CBD5E1',
+                    fontSize: 12.5,
+                    color: '#0F172A',
+                    fontFamily: 'inherit',
+                    resize: 'vertical',
+                  }}
+                  required
+                />
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, paddingTop: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => setShowLogFollowUpModal(false)}
+                  style={{
+                    padding: '7px 12px',
+                    borderRadius: 6,
+                    border: '1px solid #CBD5E1',
+                    background: '#FFFFFF',
+                    color: '#475569',
+                    fontSize: 12.5,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  style={{
+                    padding: '7px 16px',
+                    borderRadius: 6,
+                    border: 'none',
+                    background: '#0F766E',
+                    color: '#FFFFFF',
+                    fontSize: 12.5,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Save to Timeline
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL 2: ESCALATION DOSSIER ── */}
+      {showEscalationModal && activeCase && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setShowEscalationModal(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 20,
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: '#FFFFFF',
+              borderRadius: 12,
+              maxWidth: 720,
+              width: '100%',
+              maxHeight: '90vh',
+              boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.25)',
+              border: '1px solid #E2E8F0',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            <div
+              style={{
+                padding: '16px 20px',
+                borderBottom: '1px solid #E2E8F0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                background: '#F8FAFC',
+              }}
+            >
+              <div>
+                <h3 style={{ fontSize: 16, fontWeight: 800, color: '#0F172A', margin: 0 }}>
+                  Case Follow-up Dossier & Requisition Petition
+                </h3>
+                <span style={{ fontSize: 11.5, color: '#0F766E', fontWeight: 600 }}>
+                  Format for Station House Officer & Cyber Nodal Desk
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowEscalationModal(false)}
+                style={{ background: 'none', border: 'none', fontSize: 18, color: '#64748B', cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ padding: '20px 24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div
+                id="escalation-document-preview"
+                style={{
+                  background: '#FFFFFF',
+                  border: '1px solid #CBD5E1',
+                  borderRadius: 6,
+                  padding: '20px 22px',
+                  fontFamily: 'Georgia, serif',
+                  color: '#0F172A',
+                  fontSize: 13,
+                  lineHeight: 1.6,
+                }}
+              >
+                <div style={{ textAlign: 'center', borderBottom: '1px solid #CBD5E1', paddingBottom: 10, marginBottom: 14 }}>
+                  <div style={{ fontSize: 14, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    FORMAL FOLLOW-UP PETITION & INQUIRY STATUS REQUISITION
+                  </div>
+                  <div style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
+                    Under Provisions of CrPC / BNSS 2023 and Information Technology Act 2000
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: 12 }}>
+                  <strong>To:</strong><br />
+                  The Station House Officer / Investigating Officer<br />
+                  Cyber Crime Police Station, {activeCase.incident.district}, {activeCase.incident.state}<br /><br />
+                  <strong>Copy to:</strong><br />
+                  Superintendent of Police / Nodal Officer, Cyber Crime Division, {activeCase.incident.state} Police
+                </div>
+
+                <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', padding: '6px 10px', borderRadius: 4, marginBottom: 12 }}>
+                  <strong>SUBJECT:</strong> Status requisition and procedural progression regarding NCRP Token <strong>{activeCase.ackNumber || activeCase.id}</strong>
+                </div>
+
+                <div style={{ marginBottom: 10 }}>
+                  <strong>1. COMPLAINANT PARTICULARS:</strong><br />
+                  Case Reference: {activeCase.id} | Anonymous Filing: {activeCase.isAnonymous ? 'YES' : 'NO'}<br />
+                  Incident Jurisdiction: {activeCase.incident.district}, {activeCase.incident.state} ({activeCase.incident.date})
+                </div>
+
+                <div style={{ marginBottom: 10 }}>
+                  <strong>2. INCIDENT SUMMARY:</strong><br />
+                  Classification: {activeCase.primaryCrimeType} ({activeCase.subtype})<br />
+                  {activeCase.financial?.lostMoney && (
+                    <span>Disputed Sum: INR {activeCase.financial.amount} | UTR: {activeCase.financial.utr || 'Reported'}<br /></span>
+                  )}
+                  Description: {activeCase.incident.description}
+                </div>
+
+                <div style={{ marginBottom: 10 }}>
+                  <strong>3. CHRONOLOGICAL TIMELINE & RECORDED STEPS:</strong><br />
+                  <ul style={{ margin: '4px 0 0', paddingLeft: 16 }}>
+                    {activeCase.events.map((ev, i) => (
+                      <li key={i} style={{ marginBottom: 3 }}>
+                        <strong>{ev.timestamp}</strong>: {ev.title} — {ev.desc}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div style={{ marginBottom: 10 }}>
+                  <strong>4. PRESERVED EVIDENCE PARTICULARS:</strong><br />
+                  <ul style={{ margin: '4px 0 0', paddingLeft: 16 }}>
+                    {activeCase.evidence.map((ev, i) => (
+                      <li key={i} style={{ marginBottom: 2 }}>
+                        {ev.name} ({ev.category}) — SHA-256: <code style={{ fontSize: 11 }}>{ev.sha256.slice(0, 16)}...</code>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div style={{ marginBottom: 10 }}>
+                  <strong>5. SPECIFIC GRIEVANCE & ROADBLOCK:</strong><br />
+                  {isEditingDossier ? (
+                    <textarea
+                      rows={3}
+                      value={customIssueNarrative}
+                      onChange={e => setCustomIssueNarrative(e.target.value)}
+                      style={{ width: '100%', padding: 6, borderRadius: 4, border: '1px solid #0F766E', fontSize: 12.5 }}
+                    />
+                  ) : (
+                    <div style={{ color: '#334155', fontStyle: 'italic', marginTop: 2 }}>
+                      "{customIssueNarrative || activeCase.healthReason}"
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <strong>6. FORMAL PRAYER / REQUESTED ACTION:</strong><br />
+                  {isEditingDossier ? (
+                    <textarea
+                      rows={3}
+                      value={customRequestedAction}
+                      onChange={e => setCustomRequestedAction(e.target.value)}
+                      style={{ width: '100%', padding: 6, borderRadius: 4, border: '1px solid #0F766E', fontSize: 12.5 }}
+                    />
+                  ) : (
+                    <div style={{ color: '#1E293B', marginTop: 2 }}>
+                      1. Furnish a written status report on the preliminary inquiry.<br />
+                      2. {customRequestedAction}<br />
+                      3. Register regular First Information Report (FIR) if cognizable offences are substantiated.
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, borderTop: '1px solid #E2E8F0', paddingTop: 12 }}>
+            <div
+              style={{
+                padding: '12px 20px',
+                borderTop: '1px solid #E2E8F0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                background: '#FAFAFA',
+              }}
+            >
               <button
                 type="button"
-                onClick={() => window.print()}
+                onClick={() => setIsEditingDossier(!isEditingDossier)}
                 style={{
-                  padding: '7px 16px',
-                  borderRadius: 6,
-                  border: 'none',
-                  background: '#0F766E',
-                  color: '#FFFFFF',
-                  fontWeight: 600,
-                  fontSize: 12.5,
-                  cursor: 'pointer',
-                }}
-              >
-                Print / Save PDF
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowReceiptModal(false)}
-                style={{
-                  padding: '7px 14px',
+                  padding: '6px 12px',
                   borderRadius: 6,
                   border: '1px solid #CBD5E1',
                   background: '#FFFFFF',
-                  color: '#334155',
-                  fontSize: 12.5,
+                  color: isEditingDossier ? '#0F766E' : '#475569',
+                  fontSize: 12,
+                  fontWeight: 700,
                   cursor: 'pointer',
                 }}
               >
-                Close
+                {isEditingDossier ? 'Done Editing' : 'Edit Fields'}
               </button>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const el = document.getElementById('escalation-document-preview');
+                    if (el) handleCopyDossier(el.innerText);
+                  }}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: 6,
+                    border: '1px solid #CBD5E1',
+                    background: '#FFFFFF',
+                    color: '#334155',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Copy Text
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  style={{
+                    padding: '6px 16px',
+                    borderRadius: 6,
+                    border: 'none',
+                    background: '#0F766E',
+                    color: '#FFFFFF',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Download PDF / Print
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── Platform Takedown Compliance Modal ── */}
-      {showTakedownModal && selectedCase && (
+      {/* ── MODAL 3: 1930 HELPLINE PRE-CALL CHECKLIST ── */}
+      {show1930Modal && activeCase && (
         <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setShow1930Modal(false)}
           style={{
             position: 'fixed',
             inset: 0,
             background: 'rgba(15, 23, 42, 0.6)',
+            backdropFilter: 'blur(3px)',
+            zIndex: 9999,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 9999,
+            padding: 20,
           }}
         >
           <div
+            onClick={e => e.stopPropagation()}
             style={{
               background: '#FFFFFF',
-              borderRadius: 12,
-              width: 520,
-              maxWidth: '90vw',
-              padding: '24px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 16,
-              boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+              borderRadius: 10,
+              maxWidth: 460,
+              width: '100%',
+              boxShadow: '0 20px 40px rgba(15, 23, 42, 0.2)',
+              border: '1px solid #FECACA',
+              overflow: 'hidden',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #E2E8F0', paddingBottom: 12 }}>
-              <div style={{ fontSize: 15, fontWeight: 800, color: '#0F172A' }}>
-                Intermediary Takedown Audit (IT Rules Rule 3(1)(b))
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowTakedownModal(false)}
-                style={{ border: 'none', background: 'none', fontSize: 16, cursor: 'pointer', color: '#64748B' }}
-              >
-                ✕
-              </button>
+            <div style={{ padding: '14px 20px', background: '#FEF2F2', borderBottom: '1px solid #FECACA' }}>
+              <h3 style={{ fontSize: 15, fontWeight: 800, color: '#991B1B', margin: 0 }}>
+                1930 National Cyber Fraud Helpline (Toll-Free)
+              </h3>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 12.5, color: '#334155' }}>
-              <div><strong>Case File:</strong> {selectedCase.id}</div>
-              <div><strong>Offending Platform:</strong> {selectedCase.social?.platform || 'Social Media'}</div>
-              <div><strong>Offender Handle / URL:</strong> {selectedCase.social?.offenderHandle || selectedCase.social?.profileUrl || 'Profile under audit'}</div>
-              <div><strong>Statutory Notice Status:</strong> <span style={{ color: '#0F766E', fontWeight: 700 }}>Dispatched under Sec 79(3)(b) IT Act</span></div>
-              <div style={{ padding: 12, background: '#F0FDFA', borderRadius: 8, fontSize: 12, color: '#134E4A' }}>
-                Under Information Technology (Intermediary Guidelines) Rules, intermediaries are mandated to acknowledge grievances within 24 hours and disable unlawful content within 36 hours.
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, borderTop: '1px solid #E2E8F0', paddingTop: 12 }}>
-              <button
-                type="button"
-                onClick={() => {
-                  alert(`Platform Ping Sent: Re-dispatched compliance reminder to Grievance Desk for Case ${selectedCase.id}.`);
-                  setShowTakedownModal(false);
-                }}
-                style={{
-                  padding: '7px 16px',
-                  borderRadius: 6,
-                  border: 'none',
-                  background: '#0F766E',
-                  color: '#FFFFFF',
-                  fontWeight: 600,
-                  fontSize: 12.5,
-                  cursor: 'pointer',
-                }}
-              >
-                Send Compliance Reminder
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowTakedownModal(false)}
-                style={{
-                  padding: '7px 14px',
-                  borderRadius: 6,
-                  border: '1px solid #CBD5E1',
-                  background: '#FFFFFF',
-                  color: '#334155',
-                  fontSize: 12.5,
-                  cursor: 'pointer',
-                }}
-              >
-                Dismiss
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── CERT-In Advisory Modal ── */}
-      {showAdvisoryModal && selectedCase && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(15, 23, 42, 0.6)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999,
-          }}
-        >
-          <div
-            style={{
-              background: '#FFFFFF',
-              borderRadius: 12,
-              width: 540,
-              maxWidth: '90vw',
-              padding: '24px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 16,
-              boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #E2E8F0', paddingBottom: 12 }}>
-              <div style={{ fontSize: 15, fontWeight: 800, color: '#0F172A' }}>
-                CERT-In Security Advisory • CI-ADV-2026
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowAdvisoryModal(false)}
-                style={{ border: 'none', background: 'none', fontSize: 16, cursor: 'pointer', color: '#64748B' }}
-              >
-                ✕
-              </button>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 12.5, color: '#334155' }}>
-              <div><strong>Threat Variant:</strong> {selectedCase.device?.ransomExtension || 'Phobos / LockBit Ransomware'}</div>
-              <div><strong>CERT-In Directive:</strong> <span style={{ color: '#DC2626', fontWeight: 700 }}>DO NOT PAY RANSOM</span></div>
-              <p style={{ fontSize: 12, color: '#475569', lineHeight: 1.5 }}>
-                National cyber defense guidelines strictly advise against extortion payments. Payment does not guarantee decryption keys and funds international criminal syndicates.
+            <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <p style={{ fontSize: 12.5, color: '#334155', margin: 0, lineHeight: 1.5 }}>
+                Have these verified complaint particulars ready before dialing the desk officer:
               </p>
-              <ul style={{ paddingLeft: 20, margin: 0, fontSize: 12, color: '#334155', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <li>Immediately isolate infected nodes from local network and subnet.</li>
-                <li>Preserve sample encrypted files and ransom note hash.</li>
-                <li>Report to CERT-In Incident Desk: incident@cert-in.org.in</li>
-              </ul>
-            </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #E2E8F0', paddingTop: 12 }}>
-              <button
-                type="button"
-                onClick={() => setShowAdvisoryModal(false)}
-                style={{
-                  padding: '7px 16px',
-                  borderRadius: 6,
-                  border: 'none',
-                  background: '#0F766E',
-                  color: '#FFFFFF',
-                  fontWeight: 600,
-                  fontSize: 12.5,
-                  cursor: 'pointer',
-                }}
-              >
-                Understood
-              </button>
+              <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 6, padding: '10px 14px', fontSize: 12.5 }}>
+                <div><strong>NCRP Token:</strong> {activeCase.ackNumber || activeCase.id}</div>
+                <div><strong>Disputed Amount:</strong> INR {activeCase.financial?.amount || 'Reported'}</div>
+                <div><strong>Transaction UTR:</strong> {activeCase.financial?.utr || 'Check Bank Statement'}</div>
+                <div><strong>Victim Bank:</strong> {activeCase.financial?.bank || 'Your Bank'}</div>
+                <div><strong>Beneficiary:</strong> {activeCase.financial?.beneficiaryAccount || 'Reported suspect handle'}</div>
+              </div>
+
+              <div style={{ fontSize: 11.5, color: '#64748B' }}>
+                Operates 24x7 under CFCFRMS. Note down the Officer Desk ID provided during the call.
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, paddingTop: 4 }}>
+                <button
+                  type="button"
+                  onClick={() => setShow1930Modal(false)}
+                  style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #CBD5E1', background: '#FFFFFF', color: '#475569', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+                <a
+                  href="tel:1930"
+                  onClick={() => setShow1930Modal(false)}
+                  style={{
+                    padding: '6px 16px',
+                    borderRadius: 6,
+                    background: '#DC2626',
+                    color: '#FFFFFF',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    textDecoration: 'none',
+                  }}
+                >
+                  Dial 1930 Now
+                </a>
+              </div>
             </div>
           </div>
         </div>

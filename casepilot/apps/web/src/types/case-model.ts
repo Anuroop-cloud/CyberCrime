@@ -52,12 +52,22 @@ export interface CaseWorkflowStage {
   date?: string;
 }
 
+export type CaseHealth = 'On Track' | 'Waiting' | 'Attention Required' | 'Urgent' | 'Unknown';
+
 export interface CaseEvent {
   id: string;
   timestamp: string;
   title: string;
   desc: string;
-  type: 'system' | 'officer' | 'citizen';
+  source: 'official' | 'user_reported' | 'casepilot_assessment';
+  type?: 'system' | 'officer' | 'citizen';
+  officerName?: string;
+  stationOrAgency?: string;
+  followUpNote?: string;
+  referenceNumber?: string;
+  statutorySection?: string;
+  actionTaken?: string;
+  outcome?: string;
 }
 
 export interface CaseNextAction {
@@ -76,7 +86,9 @@ export interface Case {
   subtype: string;
   intakeMode: 'manual' | 'ai';
   isAnonymous: boolean;
-  health: 'Critical' | 'Good' | 'Attention' | 'Excellent';
+  health: CaseHealth;
+  healthReason?: string;
+  daysStagnant?: number;
   needsAttention: boolean;
 
   // Domain Fields

@@ -16,10 +16,10 @@ export function PortalHeader({}: Props) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '12px 28px',
+        padding: '0 28px',
         flexShrink: 0,
         zIndex: 20,
-        height: 60,
+        height: 74,
       }}
     >
       <PortalIdentity />

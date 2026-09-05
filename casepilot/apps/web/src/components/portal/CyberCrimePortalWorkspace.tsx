@@ -901,7 +901,8 @@ export function CyberCrimePortalWorkspace() {
             flex: aiOpen ? '1 1 58%' : '1 1 100%',
             display: 'flex',
             flexDirection: 'column',
-            borderRight: aiOpen ? '1px solid #E2E8F0' : 'none',
+            borderLeft: '1px solid #E2E8F0',
+            borderRight: '1px solid #E2E8F0',
             background: '#FFFFFF',
             overflow: 'hidden',
             minWidth: 0,
@@ -1064,7 +1065,7 @@ export function CyberCrimePortalWorkspace() {
               minWidth: 380,
               display: 'flex',
               flexDirection: 'column',
-              padding: '16px 20px 20px 0',
+              padding: '16px 20px 20px 12px',
               background: '#F8FAFC',
               borderLeft: '1px solid #E2E8F0',
               boxSizing: 'border-box',
@@ -1078,7 +1079,7 @@ export function CyberCrimePortalWorkspace() {
                 background: '#FFFFFF',
                 borderRadius: 20,
                 border: '1px solid #E2E8F0',
-                boxShadow: '0 10px 30px -5px rgba(15, 23, 42, 0.08), 0 2px 8px rgba(15, 23, 42, 0.04)',
+                boxShadow: '0 12px 36px -4px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(15, 23, 42, 0.04)',
                 display: 'flex',
                 flexDirection: 'column',
                 height: '100%',
@@ -1150,20 +1151,23 @@ export function CyberCrimePortalWorkspace() {
                 </button>
               </div>
 
-              {/* Conversation Stream inside Card */}
+              {/* Conversation Stream inside Card with soothing light teal/slate background */}
               <div
                 id="ai-messages-container"
+                className="no-scrollbar"
                 style={{
                   flex: 1,
                   overflowY: 'auto',
+                  scrollbarWidth: 'none',
+                  msOverflowStyle: 'none',
                   padding: '16px',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: 14,
-                  background: '#FFFFFF',
+                  background: 'linear-gradient(180deg, #F0FDFA 0%, #F8FAFC 26%, #F8FAFC 100%)',
                 }}
               >
-            {/* Empty State Hero — dark background edition */}
+            {/* Empty State Hero — refined light mode theme */}
             {chatMessages.length === 0 && (
               <div
                 style={{
@@ -1176,12 +1180,28 @@ export function CyberCrimePortalWorkspace() {
                   padding: '0 16px',
                 }}
               >
+                <div
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 12,
+                    background: '#E6FFFA',
+                    border: '1px solid #B2F5EA',
+                    color: '#0F766E',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: 12,
+                  }}
+                >
+                  <Icons.Sparkles />
+                </div>
                 <h2
                   style={{
                     fontFamily: "'Manrope', Helvetica, sans-serif",
-                    fontSize: 22,
+                    fontSize: 20,
                     fontWeight: 700,
-                    color: '#F8FAFC',
+                    color: '#0F172A',
                     margin: '0 0 6px',
                   }}
                 >
@@ -1190,17 +1210,17 @@ export function CyberCrimePortalWorkspace() {
                 <p
                   style={{
                     fontSize: 12.5,
-                    color: '#94A3B8',
-                    maxWidth: 380,
-                    margin: '0 0 16px',
+                    color: '#64748B',
+                    maxWidth: 340,
+                    margin: '0 0 18px',
                     lineHeight: 1.5,
                   }}
                 >
-                  Tell me what occurred in plain words. I will populate the official cybercrime record in the central portal as you speak.
+                  Tell me what occurred in your own words. I will assist you and prepare your official complaint record.
                 </p>
 
-                {/* Prompt Starters */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%', maxWidth: 380, textAlign: 'left' }}>
+                {/* Prompt Starters in Light Mode */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 7, width: '100%', maxWidth: 360, textAlign: 'left' }}>
                   {[
                     {
                       label: 'Bank Impersonation KYC Call (₹75,000)',
@@ -1220,19 +1240,29 @@ export function CyberCrimePortalWorkspace() {
                       type="button"
                       onClick={() => sendChatMessage(p.prompt)}
                       style={{
-                        padding: '8px 12px',
-                        background: 'rgba(255,255,255,0.07)',
-                        border: '1px solid rgba(255,255,255,0.12)',
-                        borderRadius: 8,
+                        padding: '10px 14px',
+                        background: '#FFFFFF',
+                        border: '1px solid #E2E8F0',
+                        borderRadius: 10,
                         textAlign: 'left',
                         cursor: 'pointer',
                         fontSize: 12.5,
-                        color: '#CBD5E1',
+                        color: '#1E293B',
                         lineHeight: 1.4,
                         fontFamily: "'Manrope', Helvetica, sans-serif",
+                        boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
+                        transition: 'all 150ms ease',
                       }}
-                      onMouseEnter={e => (e.currentTarget.style.borderColor = '#14B8A6')}
-                      onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)')}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.borderColor = '#0D9488';
+                        e.currentTarget.style.background = '#F0FDFA';
+                        e.currentTarget.style.color = '#0F766E';
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.borderColor = '#E2E8F0';
+                        e.currentTarget.style.background = '#FFFFFF';
+                        e.currentTarget.style.color = '#1E293B';
+                      }}
                     >
                       {p.label}
                     </button>

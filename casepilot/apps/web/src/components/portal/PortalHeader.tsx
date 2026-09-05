@@ -12,23 +12,25 @@ interface Props {
 
 export function PortalHeader({ activeTab, onTabChange }: Props) {
   return (
-    <div
+    <header
+      id="portal-top-header"
       style={{
         background: '#FFFFFF',
         borderBottom: '1px solid #E2E8F0',
-        padding: '24px 32px 20px',
+        padding: '0 24px',
+        height: 54,
+        minHeight: 54,
         display: 'flex',
-        flexDirection: 'column',
-        gap: 28,
+        alignItems: 'center',
+        justifyContent: 'space-between',
         flexShrink: 0,
+        zIndex: 30,
+        boxSizing: 'border-box',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-        <PortalIdentity />
-        <UtilityActions />
-      </div>
-      
+      <PortalIdentity />
       <PrimaryPortalNav activeTab={activeTab} onTabChange={onTabChange} />
-    </div>
+      <UtilityActions />
+    </header>
   );
 }

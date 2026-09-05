@@ -39,9 +39,12 @@ export function TrackCasePortalView({
 
       {/* ── Content Canvas ── */}
       <div
+        className="no-scrollbar"
         style={{
           flex: 1,
           overflowY: 'auto',
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
           padding: '24px 32px',
           display: 'flex',
           flexDirection: 'column',

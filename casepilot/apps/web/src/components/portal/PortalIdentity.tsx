@@ -2,11 +2,11 @@ import React from 'react';
 
 export function PortalIdentity() {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
       <div
         style={{
-          width: 38,
-          height: 38,
+          width: 30,
+          height: 30,
           borderRadius: 8,
           overflow: 'hidden',
           display: 'flex',
@@ -14,7 +14,7 @@ export function PortalIdentity() {
           justifyContent: 'center',
           background: '#FFFFFF',
           border: '1px solid #E2E8F0',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
           flexShrink: 0,
         }}
       >
@@ -29,17 +29,33 @@ export function PortalIdentity() {
         />
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <div style={{ fontSize: 18, fontWeight: 700, color: '#0F172A', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span
+          style={{
+            fontSize: 16,
+            fontWeight: 700,
+            color: '#0F172A',
+            letterSpacing: '-0.02em',
+            fontFamily: "'Manrope', Helvetica, sans-serif",
+            lineHeight: 1,
+          }}
+        >
           CasePilot
-        </div>
-        <div style={{ fontSize: 13, color: '#475569', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span>Citizen Cybercrime Portal</span>
-          <span style={{ color: '#CBD5E1' }}>|</span>
-          <span style={{ fontSize: 11, color: '#64748B', background: '#F1F5F9', padding: '2px 6px', borderRadius: 4 }}>
-            Prototype • NCRP workflow
-          </span>
-        </div>
+        </span>
+        <span
+          style={{
+            fontSize: 11,
+            color: '#0F766E',
+            background: '#F0FDFA',
+            border: '1px solid #CCFBF1',
+            padding: '2px 8px',
+            borderRadius: 6,
+            fontWeight: 600,
+            letterSpacing: '0.02em',
+          }}
+        >
+          Citizen Portal
+        </span>
       </div>
     </div>
   );

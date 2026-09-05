@@ -8,11 +8,36 @@ const PhoneCallIcon = () => (
 
 export function UtilityActions() {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#64748B' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+      <a
+        href="tel:1930"
+        id="topbar-helpline-chip"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          fontSize: 12,
+          fontWeight: 600,
+          color: '#0F766E',
+          background: '#F0FDFA',
+          border: '1px solid #CCFBF1',
+          padding: '5px 12px',
+          borderRadius: 999,
+          textDecoration: 'none',
+          transition: 'all 150ms ease',
+          fontFamily: "'Manrope', Helvetica, sans-serif",
+        }}
+        onMouseEnter={e => {
+          e.currentTarget.style.background = '#CCFBF1';
+        }}
+        onMouseLeave={e => {
+          e.currentTarget.style.background = '#F0FDFA';
+        }}
+      >
         <PhoneCallIcon />
-        <span>1930 • Cyber Fraud Helpline</span>
-      </div>
+        <span>1930</span>
+        <span style={{ color: '#0D9488', fontWeight: 500, fontSize: 11 }}>• Helpline</span>
+      </a>
     </div>
   );
 }

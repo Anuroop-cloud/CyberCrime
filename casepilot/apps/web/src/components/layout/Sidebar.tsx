@@ -8,27 +8,32 @@ import { BrandLogo } from './BrandLogo';
 
 /* ── Modern SVG Icon Primitives (Zero Emojis) ──────────────────── */
 const Icons = {
-  Grid: () => (
+  Home: () => (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="3" width="7" height="7" rx="1.5" />
-      <rect x="14" y="3" width="7" height="7" rx="1.5" />
-      <rect x="3" y="14" width="7" height="7" rx="1.5" />
-      <rect x="14" y="14" width="7" height="7" rx="1.5" />
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+      <polyline points="9 22 9 12 15 12 15 22" />
     </svg>
   ),
-  FileText: () => (
+  FilePlus: () => (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
       <polyline points="14 2 14 8 20 8" />
-      <line x1="16" y1="13" x2="8" y2="13" />
-      <line x1="16" y1="17" x2="8" y2="17" />
-      <polyline points="10 9 9 9 8 9" />
+      <line x1="12" y1="18" x2="12" y2="12" />
+      <line x1="9" y1="15" x2="15" y2="15" />
     </svg>
   ),
-  Edit: () => (
+  Activity: () => (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+      <circle cx="11" cy="11" r="8" />
+      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+      <polyline points="11 8 11 12 13 14" />
+    </svg>
+  ),
+  HelpCircle: () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
     </svg>
   ),
   Search: () => (
@@ -89,11 +94,6 @@ export default function Sidebar({ onToggle }: SidebarProps = {}) {
     api.notifications.list().then(r => setNotifCount(r.unreadCount)).catch(() => {});
   }, [pathname]);
 
-  const isActive = (href: string) => {
-    if (href === '/dashboard') return pathname === '/dashboard';
-    return pathname.startsWith(href);
-  };
-
   const W = expanded ? 240 : 74;
 
   const toggle = () => {
@@ -103,11 +103,31 @@ export default function Sidebar({ onToggle }: SidebarProps = {}) {
   };
 
   const NAV_ITEMS = [
-    { href: '/dashboard', label: 'Overview', Icon: Icons.Grid },
-    { href: '/complaints/my', label: 'My Complaints', Icon: Icons.FileText },
-    { href: '/complaints/drafts', label: 'Drafts', Icon: Icons.Edit, badge: draftCount || undefined },
-    { href: '/track', label: 'Track Your Case', Icon: Icons.Search },
+    { href: '/dashboard?tab=home', tabKey: 'home', label: 'Home', Icon: Icons.Home },
+    { href: '/dashboard?tab=register', tabKey: 'register', label: 'Register a Complaint', Icon: Icons.FilePlus },
+    { href: '/dashboard?tab=track', tabKey: 'track', label: 'Track & Take Action', Icon: Icons.Activity, badge: '4 Urgent', badgeType: 'attention' },
+    { href: '/dashboard?tab=help', tabKey: 'help', label: 'Help & Guides', Icon: Icons.HelpCircle },
   ];
+
+  const isItemActive = (item: (typeof NAV_ITEMS)[0]) => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const currentTab = urlParams.get('tab');
+      if (pathname === '/dashboard') {
+        if (item.tabKey === 'home') return !currentTab || currentTab === 'home';
+        return currentTab === item.tabKey;
+      }
+    }
+    if (pathname === '/complaints/new') return item.tabKey === 'register';
+    if (pathname === '/track') return item.tabKey === 'track';
+    return false;
+  };
+
+  const isPathActive = (href: string) => pathname === href || pathname.startsWith(href);
+
+  const handleNavClick = (tabKey: string) => {
+    window.dispatchEvent(new CustomEvent('portalTabChange', { detail: tabKey }));
+  };
 
   const BOTTOM_ITEMS = [
     { href: '/notifications', label: 'Notifications', Icon: Icons.Bell, badge: notifCount || undefined },
@@ -178,80 +198,48 @@ export default function Sidebar({ onToggle }: SidebarProps = {}) {
         </button>
       </div>
 
-      {/* ── CTA: + New Complaint Button ───────────────────── */}
-      <div style={{ padding: '0 12px', marginBottom: 16 }}>
-        <Link
-          href="/complaints/new"
-          id="sidebar-new-complaint-btn"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: expanded ? 'flex-start' : 'center',
-            gap: 10,
-            padding: expanded ? '10px 14px' : '10px',
-            background: 'linear-gradient(135deg, #135D66 0%, #10A19D 100%)',
-            color: '#FFFFFF',
-            borderRadius: 8,
-            fontWeight: 600,
-            fontSize: 13,
-            textDecoration: 'none',
-            boxShadow: '0 3px 8px rgba(19, 93, 102, 0.22)',
-            transition: 'opacity 150ms, transform 150ms',
-            whiteSpace: 'nowrap',
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.opacity = '0.92';
-            e.currentTarget.style.transform = 'translateY(-1px)';
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.opacity = '1';
-            e.currentTarget.style.transform = 'translateY(0)';
-          }}
-          title="File a New Cybercrime Complaint"
-        >
-          <Icons.Plus />
-          {expanded && <span>+ New Complaint</span>}
-        </Link>
-      </div>
-
-      {/* ── Primary Navigation ────────────────────────────── */}
-      <nav style={{ flex: 1, padding: '0 8px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+      {/* ── Primary Navigation (New Buttons & Functions, No +New Complaint) ────────────────────────────── */}
+      <nav style={{ flex: 1, padding: '0 8px', display: 'flex', flexDirection: 'column', gap: 6 }}>
         {NAV_ITEMS.map(item => {
-          const active = isActive(item.href);
+          const active = isItemActive(item);
           const hovered = hoveredItem === item.href;
 
           return (
             <Link
-              key={item.href}
+              key={item.label}
               href={item.href}
+              onClick={() => handleNavClick(item.tabKey)}
               onMouseEnter={() => setHoveredItem(item.href)}
               onMouseLeave={() => setHoveredItem(null)}
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: 12,
-                padding: expanded ? '9px 12px' : '9px',
+                padding: expanded ? '10px 14px' : '10px',
                 justifyContent: expanded ? 'flex-start' : 'center',
                 borderRadius: 8,
                 textDecoration: 'none',
-                fontWeight: active ? 600 : 500,
+                fontWeight: active ? 700 : 500,
                 fontSize: 13,
                 color: active ? '#FFFFFF' : hovered ? '#0F172A' : '#475569',
-                background: active ? '#135D66' : hovered ? '#EDEDED' : 'transparent',
-                transition: 'background 150ms, color 150ms',
+                background: active ? '#0F172A' : hovered ? '#EDEDED' : 'transparent',
+                transition: 'background 140ms ease, color 140ms ease',
                 position: 'relative',
                 whiteSpace: 'nowrap',
+                boxShadow: active ? '0 2px 8px rgba(15, 23, 42, 0.16)' : 'none',
               }}
               title={!expanded ? item.label : undefined}
             >
-              <item.Icon />
+              <span style={{ color: active ? '#38BDF8' : '#64748B', display: 'flex', alignItems: 'center' }}>
+                <item.Icon />
+              </span>
               {expanded && <span style={{ flex: 1 }}>{item.label}</span>}
               {expanded && item.badge !== undefined && (
                 <span
                   style={{
-                    background: active ? 'rgba(255, 255, 255, 0.25)' : '#E2E8F0',
-                    color: active ? '#FFFFFF' : '#475569',
-                    fontSize: 11,
+                    background: item.badgeType === 'attention' ? (active ? '#EF4444' : '#FEE2E2') : (active ? 'rgba(255, 255, 255, 0.25)' : '#E2E8F0'),
+                    color: item.badgeType === 'attention' ? (active ? '#FFFFFF' : '#B91C1C') : (active ? '#FFFFFF' : '#475569'),
+                    fontSize: 10,
                     fontWeight: 700,
                     padding: '2px 7px',
                     borderRadius: 999,
@@ -265,6 +253,7 @@ export default function Sidebar({ onToggle }: SidebarProps = {}) {
         })}
       </nav>
 
+
       {/* ── Bottom Section: Notifications, Profile, Sign Out ── */}
       <div
         style={{
@@ -276,7 +265,7 @@ export default function Sidebar({ onToggle }: SidebarProps = {}) {
         }}
       >
         {BOTTOM_ITEMS.map(item => {
-          const active = isActive(item.href);
+          const active = isPathActive(item.href);
           const hovered = hoveredItem === item.href;
 
           return (

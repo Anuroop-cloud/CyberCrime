@@ -46,11 +46,17 @@ export function getActiveTabsForFlow(flowId: FlowId, caseState: Record<string, a
   const baseConfig = getFlowConfig(flowId);
   let tabs = [...baseConfig.tabs];
 
-  // Dynamic Financial Details tab injection
+  // Dynamic Financial Details tab injection - strictly restricted to flows that support optional monetary loss
+  // (e.g. PHISHING or OTHER_CYBERCRIME where citizen explicitly reported lost money)
+  // NEVER inject into SOCIAL_MEDIA, HACKING, RANSOMWARE, HARASSMENT, or WOMEN_CHILDREN!
+  const flowsPermittingFinancialLoss: FlowId[] = ['PHISHING', 'OTHER_CYBERCRIME'];
+  const allowsDynamicFinancial = flowsPermittingFinancialLoss.includes(flowId);
+
   const hasFinancialLoss =
-    caseState.financialImpact === 'yes' ||
-    caseState.lostMoney === 'yes' ||
-    (caseState.fraudAmount && parseFloat(caseState.fraudAmount) > 0);
+    allowsDynamicFinancial &&
+    (caseState.financialImpact === 'yes' ||
+      caseState.lostMoney === 'yes' ||
+      (caseState.fraudAmount && parseFloat(caseState.fraudAmount) > 0));
 
   const alreadyHasFinancialTab = tabs.some(t => t.id === 'financial');
 

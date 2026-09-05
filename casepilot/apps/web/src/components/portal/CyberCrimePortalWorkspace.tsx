@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useToast } from '@/lib/toast-context';
 import { PortalHeader } from './PortalHeader';
 import { HomePortalView } from './HomePortalView';
@@ -13,6 +13,7 @@ import { Icons } from './Icons';
 import { FlowId } from '@/lib/complaint-flows/types';
 import { COMPLAINT_FLOWS } from '@/lib/complaint-flows/flows';
 import { getActiveTabsForFlow } from '@/lib/complaint-flows/flow-engine';
+import { getDefaultCaseStateForFlow } from '@/lib/complaint-flows/default-states';
 import { CasesStore } from '@/lib/cases-store';
 import { Case, EvidenceItem, FieldConflict } from '@/types/case-model';
 import { speechService, ttsService } from '@/lib/speech-service';
@@ -29,14 +30,51 @@ interface ChatMessage {
   agentSteps?: { label: string; status: 'done' | 'pending' | 'warning' }[];
 }
 
-export function CyberCrimePortalWorkspace() {
+interface WorkspaceProps {
+  initialTab?: 'home' | 'register' | 'track' | 'help';
+}
+
+export function CyberCrimePortalWorkspace({ initialTab }: WorkspaceProps = {}) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
   const { toast } = useToast();
 
+  const getStartingTab = (): 'home' | 'register' | 'track' | 'help' => {
+    if (initialTab) return initialTab;
+    const tabParam = searchParams?.get('tab');
+    if (tabParam === 'home' || tabParam === 'register' || tabParam === 'track' || tabParam === 'help') {
+      return tabParam;
+    }
+    if (pathname === '/complaints/new') return 'register';
+    if (pathname === '/track') return 'track';
+    return 'home';
+  };
+
   // ── Navigation State ──────────────────────────────────────────
-  const [primaryTab, setPrimaryTab] = useState<'home' | 'register' | 'track' | 'help'>('home');
+  const [primaryTab, setPrimaryTab] = useState<'home' | 'register' | 'track' | 'help'>(getStartingTab);
   const [registerSubTab, setRegisterSubTab] = useState(0);
   const [intakeMode, setIntakeMode] = useState<'manual' | 'ai'>('ai');
+
+  // Synchronize tab with sidebar custom events
+  useEffect(() => {
+    const handlePortalTab = (e: Event) => {
+      const customEvent = e as CustomEvent<'home' | 'register' | 'track' | 'help'>;
+      if (customEvent.detail && ['home', 'register', 'track', 'help'].includes(customEvent.detail)) {
+        setPrimaryTab(customEvent.detail);
+      }
+    };
+    window.addEventListener('portalTabChange', handlePortalTab);
+    return () => window.removeEventListener('portalTabChange', handlePortalTab);
+  }, []);
+
+  // Synchronize tab with URL query parameter
+  useEffect(() => {
+    const tabParam = searchParams?.get('tab') as 'home' | 'register' | 'track' | 'help' | null;
+    if (tabParam && ['home', 'register', 'track', 'help'].includes(tabParam)) {
+      setPrimaryTab(tabParam);
+    }
+  }, [searchParams]);
 
   // ── Canonical Cases Store ──────────────────────────────────────
   const [cases, setCases] = useState<Case[]>(() => CasesStore.getAllCases());
@@ -45,28 +83,12 @@ export function CyberCrimePortalWorkspace() {
   // ── Dynamic Complaint Flow State ──────────────────────────────
   const [selectedPathway, setSelectedPathway] = useState<FlowId | null>(null);
   const [flowId, setFlowId] = useState<FlowId>('FINANCIAL_FRAUD');
-  const [caseState, setCaseState] = useState<Record<string, any>>({
-    incidentDate: '2026-09-05',
-    incidentTime: '14:30',
-    stateUt: 'Maharashtra',
-    district: 'Mumbai Suburban',
-    fraudAmount: '52000',
-    bankName: 'State Bank of India',
-    paymentMode: 'UPI',
-    utrNumber: '418293847291',
-    beneficiaryAccount: 'taskpay@okhdfcbank',
-    subCategory: 'UPI / QR Code Fraud',
-    incidentDescription: 'Defrauded via a fraudulent electricity bill update message. Fraudster instructed me to scan a QR code on Google Pay which triggered an unauthorized debit to taskpay@okhdfcbank.',
-    declarationAccepted: false
-  });
+  const [caseState, setCaseState] = useState<Record<string, any>>(() =>
+    getDefaultCaseStateForFlow('FINANCIAL_FRAUD')
+  );
 
-  const [fieldStatuses, setFieldStatuses] = useState<Record<string, 'empty' | 'ai-captured' | 'user-edited' | 'confirmed'>>({
-    fraudAmount: 'ai-captured',
-    utrNumber: 'ai-captured',
-    bankName: 'ai-captured'
-  });
-
-  const [evidenceList, setEvidenceList] = useState<EvidenceItem[]>(() => cases[0]?.evidence || []);
+  const [fieldStatuses, setFieldStatuses] = useState<Record<string, 'empty' | 'ai-captured' | 'user-edited' | 'confirmed'>>({});
+  const [evidenceList, setEvidenceList] = useState<EvidenceItem[]>([]);
   const [conflicts, setConflicts] = useState<FieldConflict[]>([]);
 
   // Compute dynamic active tabs for current flow & case state
@@ -258,10 +280,11 @@ export function CyberCrimePortalWorkspace() {
     let responseText = '';
     let responseSub = '';
 
-    // 1. Classification
+    // 1. Classification & Dynamic State Segregation
     if (lower.includes('telegram') || lower.includes('task') || lower.includes('lost') || lower.includes('stolen') || lower.includes('upi') || lower.includes('45000') || lower.includes('52000') || lower.includes('75000')) {
       detectedFlow = 'FINANCIAL_FRAUD';
       setFlowId('FINANCIAL_FRAUD');
+      const freshState = getDefaultCaseStateForFlow('FINANCIAL_FRAUD', text);
 
       // Extract amount
       const amtMatch = text.match(/(?:rs\.?|₹|inr)?\s*([0-9,]+(?:\.[0-9]{1,2})?)/i);
@@ -270,53 +293,68 @@ export function CyberCrimePortalWorkspace() {
 
       if (amtMatch && parseFloat(amtMatch[1].replace(/,/g, '')) > 500) {
         const amt = amtMatch[1].replace(/,/g, '');
-        handleFieldChange('fraudAmount', amt, false);
+        freshState.fraudAmount = amt;
         extractedPills.push(`Defrauded: ₹${amt}`);
       }
       if (utrMatch) {
-        handleFieldChange('utrNumber', utrMatch[1], false);
+        freshState.utrNumber = utrMatch[1];
         extractedPills.push(`UTR: ${utrMatch[1]}`);
       }
       if (upiMatch) {
-        handleFieldChange('beneficiaryAccount', upiMatch[1], false);
+        freshState.beneficiaryAccount = upiMatch[1];
         extractedPills.push(`Beneficiary: ${upiMatch[1]}`);
       }
 
-      handleFieldChange('incidentDescription', text, false);
+      setCaseState(freshState);
+      setFieldStatuses({
+        ...(freshState.fraudAmount ? { fraudAmount: 'ai-captured' } : {}),
+        ...(freshState.utrNumber ? { utrNumber: 'ai-captured' } : {}),
+      });
 
       responseText = 'I have classified your incident as Online Financial Fraud.';
-      responseSub = 'I have extracted your transaction details and updated the middle portal. The Golden Hour 1930 inter-bank freeze sequence is active.';
-    } else if (lower.includes('instagram') || lower.includes('fake profile') || lower.includes('impersonat') || lower.includes('@')) {
+      responseSub = 'I have extracted your transaction details and updated the portal. The Golden Hour 1930 inter-bank freeze sequence is active.';
+    } else if (lower.includes('instagram') || lower.includes('fake profile') || lower.includes('impersonat') || lower.includes('@') || lower.includes('defam')) {
       detectedFlow = 'SOCIAL_MEDIA';
       setFlowId('SOCIAL_MEDIA');
+      const freshState = getDefaultCaseStateForFlow('SOCIAL_MEDIA', text);
 
       const handleMatch = text.match(/@([a-zA-Z0-9._]{3,30})/);
       if (handleMatch) {
-        handleFieldChange('offenderHandle', `@${handleMatch[1]}`, false);
-        handleFieldChange('profileUrl', `https://instagram.com/${handleMatch[1]}`, false);
+        freshState.offenderHandle = `@${handleMatch[1]}`;
+        freshState.profileUrl = `https://instagram.com/${handleMatch[1]}`;
         extractedPills.push(`Handle: @${handleMatch[1]}`);
       }
-      handleFieldChange('socialPlatform', 'Instagram', false);
-      handleFieldChange('incidentDescription', text, false);
+      freshState.socialPlatform = 'Instagram';
+      setCaseState(freshState);
+      setFieldStatuses({
+        socialPlatform: 'ai-captured',
+        ...(freshState.offenderHandle ? { offenderHandle: 'ai-captured', profileUrl: 'ai-captured' } : {}),
+      });
 
       responseText = 'I have switched the portal to Social Media & Impersonation.';
-      responseSub = 'Notice that Financial Details has been removed, and Platform Details is now active to generate a Section 79 Intermediary Takedown Notice.';
+      responseSub = 'Notice that Financial Details has been completely removed. Platform Details is now active to generate a Section 79 Intermediary Takedown Notice.';
     } else if (lower.includes('hack') || lower.includes('gmail') || lower.includes('2fa') || lower.includes('password changed')) {
       detectedFlow = 'HACKING';
       setFlowId('HACKING');
-      handleFieldChange('incidentDescription', text, false);
+      const freshState = getDefaultCaseStateForFlow('HACKING', text);
+      setCaseState(freshState);
+      setFieldStatuses({});
       responseText = 'I have loaded the Hacking & Account Compromise pathway.';
       responseSub = 'I am tracking unauthorized logins, recovery phone alterations, and 2FA bypass events.';
     } else if (lower.includes('ransom') || lower.includes('.locked') || lower.includes('encrypted') || lower.includes('bitcoin')) {
       detectedFlow = 'RANSOMWARE';
       setFlowId('RANSOMWARE');
-      handleFieldChange('incidentDescription', text, false);
+      const freshState = getDefaultCaseStateForFlow('RANSOMWARE', text);
+      setCaseState(freshState);
+      setFieldStatuses({});
       responseText = 'Emergency: Ransomware Infection Pathway Active.';
       responseSub = 'CERT-In protocol loaded. Please do not pay extortion demands without forensic coordination.';
     } else if (lower.includes('minor') || lower.includes('blackmail') || lower.includes('csam') || lower.includes('morphed private')) {
       detectedFlow = 'WOMEN_CHILDREN';
       setFlowId('WOMEN_CHILDREN');
-      handleFieldChange('incidentDescription', text, false);
+      const freshState = getDefaultCaseStateForFlow('WOMEN_CHILDREN', text);
+      setCaseState(freshState);
+      setFieldStatuses({});
       responseText = 'Confidential Women & Children Protective Pathway Initialized.';
       responseSub = 'Under NCRP provisions, you may choose to submit 100% Anonymously. Emergency takedown has been staged.';
     } else {
@@ -572,10 +610,10 @@ export function CyberCrimePortalWorkspace() {
         style={{ display: 'none' }}
       />
 
-      {/* ── TOP HEADER ── */}
-      <PortalHeader activeTab={primaryTab} onTabChange={setPrimaryTab} />
+      {/* ── TOP HEADER (Clean, single-row, spacious) ── */}
+      <PortalHeader />
 
-      {/* ── Main Dual-Zone Split: Middle Web Portal + Right AI Assistant ── */}
+      {/* ── Main Dual-Zone Split: Web Portal + Right AI Assistant ── */}
       <div
         id="portal-and-ai-container"
         style={{
@@ -587,7 +625,7 @@ export function CyberCrimePortalWorkspace() {
         }}
       >
         {/* ════════════════════════════════════════════════════════════════
-            ZONE 2 (MIDDLE): DYNAMIC STRUCTURED WEB PORTAL
+            CENTRAL WEB PORTAL CANVAS
            ════════════════════════════════════════════════════════════════ */}
         <div
           id="middle-web-portal"
@@ -595,7 +633,6 @@ export function CyberCrimePortalWorkspace() {
             flex: aiOpen ? '1 1 58%' : '1 1 100%',
             display: 'flex',
             flexDirection: 'column',
-            borderLeft: '1px solid #E2E8F0',
             borderRight: '1px solid #E2E8F0',
             background: '#FFFFFF',
             overflow: 'hidden',
@@ -611,18 +648,28 @@ export function CyberCrimePortalWorkspace() {
               cases={cases as any}
               userName="Anuroop"
               onSelectCategory={(catId) => {
-                if (COMPLAINT_FLOWS[catId as FlowId]) {
-                  setFlowId(catId as FlowId);
-                  setSelectedPathway(catId as FlowId);
+                const targetFlow = (catId as FlowId) || 'FINANCIAL_FRAUD';
+                if (COMPLAINT_FLOWS[targetFlow]) {
+                  setFlowId(targetFlow);
+                  setSelectedPathway(targetFlow);
                   setRegisterSubTab(0);
+                  setCaseState(getDefaultCaseStateForFlow(targetFlow));
+                  setFieldStatuses({});
+                  setConflicts([]);
+                  setEvidenceList([]);
                 }
                 setPrimaryTab('register');
               }}
               onNavigateToRegister={(catId) => {
                 if (catId && COMPLAINT_FLOWS[catId as FlowId]) {
-                  setFlowId(catId as FlowId);
-                  setSelectedPathway(catId as FlowId);
+                  const targetFlow = catId as FlowId;
+                  setFlowId(targetFlow);
+                  setSelectedPathway(targetFlow);
                   setRegisterSubTab(0);
+                  setCaseState(getDefaultCaseStateForFlow(targetFlow));
+                  setFieldStatuses({});
+                  setConflicts([]);
+                  setEvidenceList([]);
                 } else {
                   setSelectedPathway(null);
                 }
@@ -646,14 +693,10 @@ export function CyberCrimePortalWorkspace() {
                   setSelectedPathway(chosenFlow);
                   setFlowId(chosenFlow);
                   setRegisterSubTab(0);
-                  const flowCfg = COMPLAINT_FLOWS[chosenFlow];
-                  if (flowCfg) {
-                    setCaseState(prev => ({
-                      ...prev,
-                      primaryCrimeType: chosenFlow,
-                      subCategory: flowCfg.subcategories[0] || '',
-                    }));
-                  }
+                  setCaseState(getDefaultCaseStateForFlow(chosenFlow));
+                  setFieldStatuses({});
+                  setConflicts([]);
+                  setEvidenceList([]);
                 }}
                 onStartAiIntake={(initialPrompt) => {
                   setAiOpen(true);

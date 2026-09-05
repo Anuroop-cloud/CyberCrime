@@ -71,7 +71,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('sidebarToggle', handler as EventListener);
   }, []);
 
-  const isFullWorkspace = pathname === '/complaints/new' || pathname === '/dashboard' || pathname.startsWith('/dashboard');
+  const isFullWorkspace = pathname === '/complaints/new' || pathname === '/dashboard' || pathname.startsWith('/dashboard') || pathname === '/track';
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#F8FAFC' }}>

@@ -743,10 +743,7 @@ export function CyberCrimePortalWorkspace({ initialTab }: WorkspaceProps = {}) {
 
           {/* MODULE 4: HELP & GUIDES */}
           {primaryTab === 'help' && (
-            <HelpPortalView
-              onNavigateToRegister={() => setPrimaryTab('register')}
-              onNavigateToTrack={() => setPrimaryTab('track')}
-            />
+            <HelpPortalView />
           )}
         </div>
 

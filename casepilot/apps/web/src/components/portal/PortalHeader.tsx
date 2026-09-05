@@ -13,19 +13,17 @@ interface Props {
 export function PortalHeader({ activeTab, onTabChange }: Props) {
   return (
     <header
-      id="portal-top-header"
       style={{
         background: '#FFFFFF',
         borderBottom: '1px solid #E2E8F0',
         padding: '0 24px',
-        height: 54,
-        minHeight: 54,
+        height: 52,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
+        gap: 16,
         flexShrink: 0,
-        zIndex: 30,
-        boxSizing: 'border-box',
+        zIndex: 20,
       }}
     >
       <PortalIdentity />

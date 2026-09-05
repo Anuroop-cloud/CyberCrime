@@ -16,15 +16,17 @@ const TABS: { id: PrimaryTab; label: string }[] = [
 
 export function PrimaryPortalNav({ activeTab, onTabChange }: Props) {
   return (
-    <div
+    <nav
+      aria-label="Portal Navigation"
       style={{
-        display: 'flex',
+        display: 'inline-flex',
         alignItems: 'center',
-        gap: 3,
-        background: '#F1F5F9',
+        background: '#FFFFFF',
         border: '1px solid #E2E8F0',
-        padding: '3px 4px',
-        borderRadius: 999,
+        borderRadius: 10,
+        padding: '3px',
+        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
+        gap: 2,
       }}
     >
       {TABS.map(tab => {
@@ -35,24 +37,36 @@ export function PrimaryPortalNav({ activeTab, onTabChange }: Props) {
             type="button"
             onClick={() => onTabChange(tab.id)}
             style={{
-              padding: '5px 14px',
+              padding: '6px 16px',
               border: 'none',
-              background: isActive ? '#0F172A' : 'transparent',
+              background: isActive ? '#000000' : 'transparent',
               color: isActive ? '#FFFFFF' : '#475569',
               fontSize: 12.5,
               fontWeight: isActive ? 600 : 500,
-              borderRadius: 999,
+              borderRadius: 7,
               cursor: 'pointer',
-              transition: 'all 150ms ease',
+              transition: 'all 120ms ease',
               fontFamily: "'Manrope', Helvetica, sans-serif",
               whiteSpace: 'nowrap',
-              boxShadow: isActive ? '0 1px 3px rgba(15, 23, 42, 0.15)' : 'none',
+              lineHeight: 1.3,
+            }}
+            onMouseEnter={e => {
+              if (!isActive) {
+                e.currentTarget.style.color = '#0F172A';
+                e.currentTarget.style.background = '#F8FAFC';
+              }
+            }}
+            onMouseLeave={e => {
+              if (!isActive) {
+                e.currentTarget.style.color = '#475569';
+                e.currentTarget.style.background = 'transparent';
+              }
             }}
           >
             {tab.label}
           </button>
         );
       })}
-    </div>
+    </nav>
   );
 }

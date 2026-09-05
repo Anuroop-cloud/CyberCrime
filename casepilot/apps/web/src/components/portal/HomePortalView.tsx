@@ -62,33 +62,8 @@ export function HomePortalView({ cases, userName = 'Anuroop', onSelectCategory, 
   });
 
   return (
-    // dashboard.jsx: flex flex-col -m-6 p-6 bg-white w-full lg:max-w-5xl lg:px-8 mx-auto
-    <div
-      className="no-scrollbar"
-      style={{
-        flex: 1,
-        overflowY: 'auto',
-        scrollbarWidth: 'none',
-        msOverflowStyle: 'none',
-        background: '#FFFFFF',
-        width: '100%',
-      }}
-    >
-      <div
-        id="home-dashboard-content"
-        style={{
-          maxWidth: '58rem',
-          margin: '0 auto',
-          padding: '20px 36px 48px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 16,
-          borderLeft: '1px solid #E2E8F0',
-          borderRight: '1px solid #E2E8F0',
-          minHeight: '100%',
-          boxSizing: 'border-box',
-        }}
-      >
+    <div style={{ flex: 1, overflowY: 'auto', background: '#FFFFFF', width: '100%', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+      <div style={{ maxWidth: '56rem', margin: '0 auto', padding: '16px 32px 48px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
         {/* GREETING — H3-Med-500: Manrope 28px 500 letter-spacing -0.84px */}
         <div style={{ ...b1, fontSize: 28, letterSpacing: '-0.84px', lineHeight: '100%', color: '#111827', marginBottom: 8 }}>

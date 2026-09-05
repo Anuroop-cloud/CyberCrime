@@ -2,19 +2,19 @@ import React from 'react';
 
 export function PortalIdentity() {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
       <div
         style={{
-          width: 30,
-          height: 30,
-          borderRadius: 8,
+          width: 28,
+          height: 28,
+          borderRadius: 6,
           overflow: 'hidden',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           background: '#FFFFFF',
           border: '1px solid #E2E8F0',
-          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
           flexShrink: 0,
         }}
       >
@@ -29,33 +29,17 @@ export function PortalIdentity() {
         />
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span
-          style={{
-            fontSize: 16,
-            fontWeight: 700,
-            color: '#0F172A',
-            letterSpacing: '-0.02em',
-            fontFamily: "'Manrope', Helvetica, sans-serif",
-            lineHeight: 1,
-          }}
-        >
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: '#0F172A', letterSpacing: '-0.02em', lineHeight: 1 }}>
           CasePilot
-        </span>
-        <span
-          style={{
-            fontSize: 11,
-            color: '#0F766E',
-            background: '#F0FDFA',
-            border: '1px solid #CCFBF1',
-            padding: '2px 8px',
-            borderRadius: 6,
-            fontWeight: 600,
-            letterSpacing: '0.02em',
-          }}
-        >
-          Citizen Portal
-        </span>
+        </div>
+        <div style={{ fontSize: 11.5, color: '#64748B', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span>Citizen Cybercrime Portal</span>
+          <span style={{ color: '#CBD5E1' }}>•</span>
+          <span style={{ fontSize: 10, color: '#64748B', background: '#F1F5F9', padding: '1px 5px', borderRadius: 4 }}>
+            Prototype
+          </span>
+        </div>
       </div>
     </div>
   );

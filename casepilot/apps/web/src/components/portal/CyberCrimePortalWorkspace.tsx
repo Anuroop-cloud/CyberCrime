@@ -889,11 +889,12 @@ export function CyberCrimePortalWorkspace() {
           flex: 1,
           overflow: 'hidden',
           minWidth: 0,
+          background: '#F8FAFC',
         }}
       >
         {/* ════════════════════════════════════════════════════════════════
             ZONE 2 (MIDDLE): THE COMPREHENSIVE WEB PORTAL WORKSPACE
-            Inspired by HealthSutra Information Architecture
+            Framed with clean left and right borders
            ════════════════════════════════════════════════════════════════ */}
         <div
           id="middle-web-portal"
@@ -907,6 +908,8 @@ export function CyberCrimePortalWorkspace() {
             overflow: 'hidden',
             minWidth: 0,
             transition: 'flex 200ms cubic-bezier(0.4, 0, 0.2, 1)',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
           }}
         >
 
@@ -1065,9 +1068,9 @@ export function CyberCrimePortalWorkspace() {
               minWidth: 380,
               display: 'flex',
               flexDirection: 'column',
-              padding: '16px 20px 20px 12px',
-              background: '#F8FAFC',
-              borderLeft: '1px solid #E2E8F0',
+              padding: '16px 20px 20px 16px',
+              background: 'transparent',
+              borderLeft: 'none',
               boxSizing: 'border-box',
               flexShrink: 0,
             }}
@@ -1079,7 +1082,7 @@ export function CyberCrimePortalWorkspace() {
                 background: '#FFFFFF',
                 borderRadius: 20,
                 border: '1px solid #E2E8F0',
-                boxShadow: '0 12px 36px -4px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(15, 23, 42, 0.04)',
+                boxShadow: '0 10px 30px -5px rgba(15, 23, 42, 0.08), 0 2px 8px rgba(15, 23, 42, 0.04)',
                 display: 'flex',
                 flexDirection: 'column',
                 height: '100%',
@@ -1151,23 +1154,22 @@ export function CyberCrimePortalWorkspace() {
                 </button>
               </div>
 
-              {/* Conversation Stream inside Card with soothing light teal/slate background */}
+              {/* Conversation Stream inside Card */}
               <div
                 id="ai-messages-container"
-                className="no-scrollbar"
                 style={{
                   flex: 1,
                   overflowY: 'auto',
-                  scrollbarWidth: 'none',
-                  msOverflowStyle: 'none',
                   padding: '16px',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: 14,
-                  background: 'linear-gradient(180deg, #F0FDFA 0%, #F8FAFC 26%, #F8FAFC 100%)',
+                  background: '#FFFFFF',
+                  scrollbarWidth: 'none',
+                  msOverflowStyle: 'none',
                 }}
               >
-            {/* Empty State Hero — refined light mode theme */}
+            {/* Empty State Hero — dark background edition */}
             {chatMessages.length === 0 && (
               <div
                 style={{
@@ -1180,28 +1182,12 @@ export function CyberCrimePortalWorkspace() {
                   padding: '0 16px',
                 }}
               >
-                <div
-                  style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: 12,
-                    background: '#E6FFFA',
-                    border: '1px solid #B2F5EA',
-                    color: '#0F766E',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginBottom: 12,
-                  }}
-                >
-                  <Icons.Sparkles />
-                </div>
                 <h2
                   style={{
                     fontFamily: "'Manrope', Helvetica, sans-serif",
-                    fontSize: 20,
+                    fontSize: 22,
                     fontWeight: 700,
-                    color: '#0F172A',
+                    color: '#F8FAFC',
                     margin: '0 0 6px',
                   }}
                 >
@@ -1210,17 +1196,17 @@ export function CyberCrimePortalWorkspace() {
                 <p
                   style={{
                     fontSize: 12.5,
-                    color: '#64748B',
-                    maxWidth: 340,
-                    margin: '0 0 18px',
+                    color: '#94A3B8',
+                    maxWidth: 380,
+                    margin: '0 0 16px',
                     lineHeight: 1.5,
                   }}
                 >
-                  Tell me what occurred in your own words. I will assist you and prepare your official complaint record.
+                  Tell me what occurred in plain words. I will populate the official cybercrime record in the central portal as you speak.
                 </p>
 
-                {/* Prompt Starters in Light Mode */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 7, width: '100%', maxWidth: 360, textAlign: 'left' }}>
+                {/* Prompt Starters */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%', maxWidth: 380, textAlign: 'left' }}>
                   {[
                     {
                       label: 'Bank Impersonation KYC Call (₹75,000)',
@@ -1240,29 +1226,19 @@ export function CyberCrimePortalWorkspace() {
                       type="button"
                       onClick={() => sendChatMessage(p.prompt)}
                       style={{
-                        padding: '10px 14px',
-                        background: '#FFFFFF',
-                        border: '1px solid #E2E8F0',
-                        borderRadius: 10,
+                        padding: '8px 12px',
+                        background: 'rgba(255,255,255,0.07)',
+                        border: '1px solid rgba(255,255,255,0.12)',
+                        borderRadius: 8,
                         textAlign: 'left',
                         cursor: 'pointer',
                         fontSize: 12.5,
-                        color: '#1E293B',
+                        color: '#CBD5E1',
                         lineHeight: 1.4,
                         fontFamily: "'Manrope', Helvetica, sans-serif",
-                        boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
-                        transition: 'all 150ms ease',
                       }}
-                      onMouseEnter={e => {
-                        e.currentTarget.style.borderColor = '#0D9488';
-                        e.currentTarget.style.background = '#F0FDFA';
-                        e.currentTarget.style.color = '#0F766E';
-                      }}
-                      onMouseLeave={e => {
-                        e.currentTarget.style.borderColor = '#E2E8F0';
-                        e.currentTarget.style.background = '#FFFFFF';
-                        e.currentTarget.style.color = '#1E293B';
-                      }}
+                      onMouseEnter={e => (e.currentTarget.style.borderColor = '#14B8A6')}
+                      onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)')}
                     >
                       {p.label}
                     </button>

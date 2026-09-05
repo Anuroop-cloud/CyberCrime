@@ -75,18 +75,16 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#F8FAFC' }}>
-      {!isFullWorkspace && (
-        <Sidebar
-          onToggle={(w: number) => {
-            setSidebarW(w);
-            window.dispatchEvent(new CustomEvent('sidebarToggle', { detail: { width: w } }));
-          }}
-        />
-      )}
+      <Sidebar
+        onToggle={(w: number) => {
+          setSidebarW(w);
+          window.dispatchEvent(new CustomEvent('sidebarToggle', { detail: { width: w } }));
+        }}
+      />
       <div
         id="main-content"
         style={{
-          marginLeft: isFullWorkspace ? 0 : sidebarW,
+          marginLeft: sidebarW,
           flex: 1,
           display: 'flex',
           flexDirection: 'column',

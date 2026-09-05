@@ -39,17 +39,16 @@ export function TrackCasePortalView({
 
       {/* ── Content Canvas ── */}
       <div
-        className="no-scrollbar"
         style={{
           flex: 1,
           overflowY: 'auto',
-          scrollbarWidth: 'none',
-          msOverflowStyle: 'none',
           padding: '24px 32px',
           display: 'flex',
           flexDirection: 'column',
           gap: 20,
           background: '#FFFFFF',
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
         }}
       >
         {/* ── Section 1: Strong Case Header Summary Container (Section 14) ── */}

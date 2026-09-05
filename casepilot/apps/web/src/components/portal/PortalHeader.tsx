@@ -25,7 +25,7 @@ export function PortalHeader({ activeTab, onTabChange }: Props) {
       {/* Top Header Row */}
       <div
         style={{
-          padding: '10px 24px 8px',
+          padding: '10px 28px 8px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -39,7 +39,7 @@ export function PortalHeader({ activeTab, onTabChange }: Props) {
       {/* Tab Bar Row below Header */}
       <div
         style={{
-          padding: '6px 24px 8px',
+          padding: '8px 28px 10px',
           display: 'flex',
           alignItems: 'center',
         }}

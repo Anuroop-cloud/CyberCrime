@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '@/lib/toast-context';
 import { PortalHeader } from './PortalHeader';
 import { HomePortalView } from './HomePortalView';
+import { ComplaintPathwaySelectorView } from './ComplaintPathwaySelectorView';
 import { DynamicComplaintWorkspace } from './DynamicComplaintWorkspace';
 import { TrackCasePortalView } from './TrackCasePortalView';
 import { HelpPortalView } from './HelpPortalView';
@@ -42,6 +43,7 @@ export function CyberCrimePortalWorkspace() {
   const [selectedCaseId, setSelectedCaseId] = useState<string>('CC-2026-88192');
 
   // ── Dynamic Complaint Flow State ──────────────────────────────
+  const [selectedPathway, setSelectedPathway] = useState<FlowId | null>(null);
   const [flowId, setFlowId] = useState<FlowId>('FINANCIAL_FRAUD');
   const [caseState, setCaseState] = useState<Record<string, any>>({
     incidentDate: '2026-09-05',
@@ -323,6 +325,7 @@ export function CyberCrimePortalWorkspace() {
       handleFieldChange('incidentDescription', text, false);
     }
 
+    setSelectedPathway(detectedFlow);
     setPrimaryTab('register');
 
     const newMsg: ChatMessage = {
@@ -356,6 +359,7 @@ export function CyberCrimePortalWorkspace() {
     else if (pathwayLabel.includes('Women')) targetFlow = 'WOMEN_CHILDREN';
 
     setFlowId(targetFlow);
+    setSelectedPathway(targetFlow);
     setPrimaryTab('register');
     setRegisterSubTab(0);
 
@@ -609,12 +613,18 @@ export function CyberCrimePortalWorkspace() {
               onSelectCategory={(catId) => {
                 if (COMPLAINT_FLOWS[catId as FlowId]) {
                   setFlowId(catId as FlowId);
+                  setSelectedPathway(catId as FlowId);
+                  setRegisterSubTab(0);
                 }
                 setPrimaryTab('register');
               }}
               onNavigateToRegister={(catId) => {
                 if (catId && COMPLAINT_FLOWS[catId as FlowId]) {
                   setFlowId(catId as FlowId);
+                  setSelectedPathway(catId as FlowId);
+                  setRegisterSubTab(0);
+                } else {
+                  setSelectedPathway(null);
                 }
                 setPrimaryTab('register');
               }}
@@ -628,26 +638,51 @@ export function CyberCrimePortalWorkspace() {
             />
           )}
 
-          {/* MODULE 2: DYNAMIC COMPLAINT WORKSPACE */}
+          {/* MODULE 2: COMPLAINT WORKSPACE (Category Hub or Dynamic Form) */}
           {primaryTab === 'register' && (
-            <DynamicComplaintWorkspace
-              flowConfig={currentFlowConfig}
-              activeTabs={activeTabs}
-              activeTabIndex={registerSubTab}
-              onTabChange={setRegisterSubTab}
-              caseState={caseState}
-              onFieldChange={handleFieldChange}
-              fieldStatuses={fieldStatuses}
-              conflicts={conflicts}
-              onResolveConflict={handleResolveConflict}
-              evidenceList={evidenceList}
-              onAddEvidence={handleAddEvidence}
-              onRemoveEvidence={handleRemoveEvidence}
-              intakeMode={intakeMode}
-              onToggleIntakeMode={setIntakeMode}
-              onSaveDraft={handleSaveDraft}
-              onSubmitComplaint={handleSubmitComplaint}
-            />
+            selectedPathway === null ? (
+              <ComplaintPathwaySelectorView
+                onSelectPathway={(chosenFlow) => {
+                  setSelectedPathway(chosenFlow);
+                  setFlowId(chosenFlow);
+                  setRegisterSubTab(0);
+                  const flowCfg = COMPLAINT_FLOWS[chosenFlow];
+                  if (flowCfg) {
+                    setCaseState(prev => ({
+                      ...prev,
+                      primaryCrimeType: chosenFlow,
+                      subCategory: flowCfg.subcategories[0] || '',
+                    }));
+                  }
+                }}
+                onStartAiIntake={(initialPrompt) => {
+                  setAiOpen(true);
+                  if (initialPrompt) {
+                    setChatInput(initialPrompt);
+                  }
+                }}
+              />
+            ) : (
+              <DynamicComplaintWorkspace
+                flowConfig={currentFlowConfig}
+                activeTabs={activeTabs}
+                activeTabIndex={registerSubTab}
+                onTabChange={setRegisterSubTab}
+                caseState={caseState}
+                onFieldChange={handleFieldChange}
+                fieldStatuses={fieldStatuses}
+                conflicts={conflicts}
+                onResolveConflict={handleResolveConflict}
+                evidenceList={evidenceList}
+                onAddEvidence={handleAddEvidence}
+                onRemoveEvidence={handleRemoveEvidence}
+                intakeMode={intakeMode}
+                onToggleIntakeMode={setIntakeMode}
+                onSaveDraft={handleSaveDraft}
+                onSubmitComplaint={handleSubmitComplaint}
+                onBackToCategories={() => setSelectedPathway(null)}
+              />
+            )
           )}
 
           {/* MODULE 3: TRACK & TAKE ACTION */}

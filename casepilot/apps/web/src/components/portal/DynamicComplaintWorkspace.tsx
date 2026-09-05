@@ -41,6 +41,7 @@ interface Props {
 
   onSaveDraft: () => void;
   onSubmitComplaint: () => void;
+  onBackToCategories?: () => void;
 }
 
 export function DynamicComplaintWorkspace({
@@ -59,7 +60,8 @@ export function DynamicComplaintWorkspace({
   intakeMode,
   onToggleIntakeMode,
   onSaveDraft,
-  onSubmitComplaint
+  onSubmitComplaint,
+  onBackToCategories,
 }: Props) {
   const currentTab = activeTabs[activeTabIndex] || activeTabs[0];
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -130,6 +132,72 @@ export function DynamicComplaintWorkspace({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+      {/* ── Active Category Header Strip ── */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '10px 24px 8px',
+          background: '#FAFAFA',
+          borderBottom: '1px solid #F1F5F9',
+          flexShrink: 0,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {onBackToCategories && (
+            <button
+              type="button"
+              onClick={onBackToCategories}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5,
+                background: '#FFFFFF',
+                border: '1px solid #CBD5E1',
+                borderRadius: 6,
+                padding: '4px 10px',
+                fontSize: 12,
+                fontWeight: 600,
+                color: '#334155',
+                cursor: 'pointer',
+                transition: 'all 140ms ease',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.borderColor = '#0F766E';
+                e.currentTarget.style.color = '#0F766E';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.borderColor = '#CBD5E1';
+                e.currentTarget.style.color = '#334155';
+              }}
+            >
+              ← Change Crime Category
+            </button>
+          )}
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>
+            {flowConfig.title}
+          </span>
+          <span
+            style={{
+              fontSize: 10.5,
+              background: '#F0FDFA',
+              color: '#0F766E',
+              border: '1px solid #CCFBF1',
+              padding: '1px 8px',
+              borderRadius: 12,
+              fontWeight: 700,
+            }}
+          >
+            NCRP: {flowConfig.ncrpCategory}
+          </span>
+        </div>
+
+        <div style={{ fontSize: 11.5, color: '#64748B' }}>
+          Step {activeTabIndex + 1} of {activeTabs.length}: <strong>{currentTab.label}</strong>
+        </div>
+      </div>
+
       {/* ── Top Dynamic Tab Bar with Stretched Pill Styling Matching Home Tab ── */}
       <div
         style={{
